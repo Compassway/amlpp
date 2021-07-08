@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from tpot import TPOTRegressor
 
 import pandas as pd
+import pickle
 import shap
 
 ##############################################################################
@@ -37,10 +38,12 @@ class Conveyor:
     ##############################################################################
 
     # @lead_time
-    def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series, feature_importances:str = False):
+    def fit(self, X:pd.DataFrame,
+                  Y:pd.DataFrame or pd.Series,
+                  feature_importances:str = False):
         self._fit(X, Y)
         if feature_importances:
-            self.feature_importances(X, Y)
+            self.feature_importances(X, Y, transform = False)
 
     # @lead_time
     def fit_transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
@@ -53,6 +56,7 @@ class Conveyor:
     def _fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
         X_, Y_  = (X.copy(), Y.copy())
         for block in self.blocks[:-1]:
+            print(block)
             block.fit(X_, Y_)
             X_, Y_ = self._transform(block, X_, Y_)
         self.blocks[-1].fit(X_, Y_)
@@ -98,28 +102,29 @@ class Conveyor:
         """
         X_, Y_ = self.transform(X.copy(), Y.copy())
         result = self.blocks[-1].predict(X_)
-
         for func in sklearn_function:
             try:
                 exec('from sklearn.metrics import ' + func)
                 print("function - {} = ".
-                        format(func), eval("{}(result, Y_)".format(func)))
+                        format(func), eval("{}(Y_, result)".format(func)))
             except Exception as e:
                 print("function - {} = ERROR: {}".format(func, e))
         for func in precision_function:
             try:
                 print("function - {} = ".
-                        format(func.__name__), func(result, Y_))
+                        format(func.__name__), func(Y_, result))
             except Exception as e:
                 print("function - {} = ERROR: {}".format(func.__name__, e))
     # @lead_time
     def feature_importances(self,
                             X:pd.DataFrame,
                             Y:pd.DataFrame or pd.Series, 
-                            show:str = 'all'): # all, sklearn, shap
+                            show:str = 'all', # all, sklearn, shap
+                            transform = True): 
                             
-        X_, Y_ = self.transform(X.copy(), Y.copy())
-        estimator = self.blocks[-1][-1] if type(self.blocks[-1]) == Pipeline else self.blocks[-1]
+        if transform:
+            X_, Y_ = self.transform(X.copy(), Y.copy())
+            estimator = self.blocks[-1][-1] if type(self.blocks[-1]) == Pipeline else self.blocks[-1]
 
         if show == 'all' or show == 'shap':
             try:
@@ -149,8 +154,13 @@ class Conveyor:
                     type_model:str = 'regressor', estimator:bool = False,
                     generations:int = 5, population_size:int = 50, n_jobs:int = -1):
 
-        tpot = TPOTRegressor(generations=1, population_size=20, n_jobs = -1, random_state=42)
+        tpot = TPOTRegressor(generations=generations, 
+                             population_size=population_size,
+                             n_jobs = n_jobs,
+                            random_state=42)
+                            
         X_, Y_ = self.fit_transform(X, Y) if not estimator else self._fit(X, Y)
+        print('start fit model !!!!')
         tpot.fit(X_, Y_)
         make_pipe, import_libs = tpot.export('', get_pipeline=True)
 
@@ -169,6 +179,8 @@ class Conveyor:
             
         self.blocks[-1].fit(X_, Y_)
         print(self.blocks)
+        with open('export_model', 'wb') as save_file:
+            pickle.dump(self, save_file)
     ##############################################################################
     # @lead_time
     def export(self):

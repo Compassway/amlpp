@@ -1,14 +1,21 @@
+from sklearn.experimental import enable_iterative_imputer
 from sklearn.preprocessing import OrdinalEncoder
+from sklearn.impute import IterativeImputer as IterativeImputer
+from sklearn.impute import SimpleImputer as SimpleImputer
 from nltk.tokenize import word_tokenize
 from nltk.stem import SnowballStemmer
 from nltk.corpus import stopwords
+import nltk
 
 from gensim.models import Word2Vec
-from AMLpp.additional.secondary_functions import *
+from AMLpp.additional.secondary_functions import shelve_save, shelve_load, most_frequency
 from typing import List, Callable
 import pandas as pd
 import numpy as np
 import pymorphy2
+
+nltk.download('stopwords')
+nltk.download('punkt')
 
 snowball = SnowballStemmer(language="russian")
 morph = pymorphy2.MorphAnalyzer()
@@ -34,102 +41,154 @@ class CategoricalEncoder():
     """
     encoder = {}
 
-    def __init__(self, columns:List[str], strategy:str='mean', fill_value:float or str = np.nan): # strategy in mean, median, most_frequency, const, iterative inputer?
+    def __init__(self, columns:List[str], fill_strategy:str='mean', fill_value:float or str = np.nan):
         self.columns = columns
-        self.fill_value = {'mean':np.mean, 'median':np.median, 'most_freq':most_frequency, 'const':(lambda x:fill_value)}
-        self.fill_value = self.fill_value[strategy]
+        self.user_value = fill_value
+        self.fill_value = {'mean':np.mean, 'median':np.median, 'most_freq':most_frequency, 'const':self.return_fill_value}
+        self.fill_value = self.fill_value[fill_strategy]
 
     def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
         for column in self.columns:
             self.encoder[column] = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=np.nan)
             X_fit = pd.DataFrame(X[column].loc[~X[column].isnull()])
-            self.encoder[column].fit(X_fit)
-            X_transform = self.encoder[column].transform(pd.DataFrame(X_fit))
-            self.encoder[column].unknown_value = self.fill_value(X_transform)
+            if len(X_fit) > 0:
+                self.encoder[column].fit(X_fit)
+                X_transform = self.encoder[column].transform(pd.DataFrame(X_fit))
+                self.encoder[column].unknown_value = self.fill_value(X_transform)
+            else:
+                self.encoder[column] = False
         shelve_save(self.encoder, 'CategoricalEncoder')
         return self
 
     def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
         self.encoder = shelve_load('CategoricalEncoder')
         for column in self.columns:
-            X[column] = self.encoder[column].transform(pd.DataFrame(X[column].fillna('NAN')))
+            if self.encoder[column]:
+                X[column] = self.encoder[column].transform(pd.DataFrame(X[column].fillna('NAN')))
+            else:
+                del X[column]
+        return X
+    def return_fill_value(self, trash):
+        return self.user_value
+
+##############################################################################
+
+class Word2Vectorization():
+
+    fill = {} 
+    word2 = {} 
+
+    def __init__(self, columns:List[str], level_formatting:int = 1, fill_strategy:str='mean', fill_value:float or str = np.nan, **params_for_word2vec):
+        self.columns = columns
+        self.level_formatting = level_formatting
+        self.fill_value = {'mean':np.mean, 'median':np.median, 'most_freq':most_frequency, 'const':(lambda x:fill_value)}
+        self.fill_value = self.fill_value[fill_strategy]
+        self.params_for_word2vec = params_for_word2vec if params_for_word2vec != {} else \
+                {'epochs':5000, 'min_count':1, 'window':5, 'vector_size':1, 'sg':1, 'cbow_mean':1, 'alpha':0.1}
+
+    def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
+        for column in self.columns: 
+            dictionary = [self.refactor_string(str(i)) for i in X[column]]
+            self.word2[column] = Word2Vec(**self.params_for_word2vec, seed = 42)
+
+            word_vac = [self.word2[column].wv[i] for i in self.word2[column].wv.key_to_index.values()]
+            self.fill[column] = self.fill_value(word_vac)
+        shelve_save(self.fill, 'fill_word2vec')
+        shelve_save(self.word2, 'word2')
+        return self
+    def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
+        self.fill = shelve_load('fill_word2vec')
+        self.word2 = shelve_load('word2')
+        for column in self.columns:
+            X[column] = list([self.mean_word2vec(val, column) for val in X[column]])
         return X
 
-# class Word2Vectorization():
+    def refactor_string(self, string:str)->List[str]:
+        string = string if str(string) != 'nan' else ""                          # Проверка на NAN
+        string = word_tokenize(str(string).lower())                              # Нижний регистр и токенизация
+        if self.level_formatting > 0:
+            string = [i for i in string if i.isalpha()]                              # Избавления от знаков пунктуации
+            if self.level_formatting > 1:
+                string = [i for i in string if not i in stop_words]                      # Избавления от стоп слов
+                if self.level_formatting > 2:
+                    string = [snowball.stem(morph.parse(i)[0].normal_form) for i in string]  # СТЭММИНГ и ЛЕММАТИЗАЦИЯ
+        return string
 
-#     len_sentence = {} 
-#     mean_word = {} 
-#     word2 = {} 
+    def mean_word2vec(self, sentence:str, column:str) ->List[float]:
+        vector = self.refactor_string(sentence)
+        vector = [self.word2[column].wv[token] for token in vector if token in self.word2[column].wv.key_to_index.keys()]
+        return np.mean(vector) if vector != [] else self.fill[column]
 
-#     def __init__(self, columns:List[str], level_formatting:int = 0):
-#         self.columns = columns
 
-#     def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
-#         for column in self.columns: 
-#             filtered = [self.refactor_string(str(i)) for i in X[column]]
-#             self.word2[column] = Word2Vec(sentences=filtered, epochs=5000, 
-#                                     min_count=1, window=5, vector_size=1,
-#                                     sg=1, cbow_mean=1, alpha=0.1,
-#                                     seed=self.seed)
+##############################################################################
 
-#             word_vac = [self.word2[column].wv[i] for i in self.word2[column].wv.key_to_index.values()]
-#             self.len_sentence[column] = max([len(sentence) for sentence in filtered]) 
-#             self.mean_word[column] = np.mean(word_vac)                              
-#         return self
-#     def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
-        
-#         return X
+class ImputerValue():
+    current_columns = None
+    def __init__(self, columns:List[str] or None = None,  missing_values=np.nan, strategy='mean'):
+        self.columns = columns 
+        self.imputer = SimpleImputer(missing_values=missing_values, strategy=strategy)
 
-#     def refactor_string(self, string:str)->List[str]:
-#         string = string if str(string) != 'nan' else ""                          # Проверка на NAN
-#         string = word_tokenize(str(string).lower())                              # Нижний регистр и токенизация
-#         if self.level_formatting > 0:
-#             string = [i for i in string if i.isalpha()]                              # Избавления от знаков пунктуации
-#             if self.level_formatting > 1:
-#                 string = [i for i in string if not i in stop_words]                      # Избавления от стоп слов
-#                 if self.level_formatting > 2:
-#                     string = [snowball.stem(morph.parse(i)[0].normal_form) for i in string]  # СТЭММИНГ и ЛЕММАТИЗАЦИЯ
-#         return string
 
-#     def mean_word2vec(self, sentence:str, column:str) ->List[float]:
-#         vector = self.refactor_string(sentence)
-#         vector = [self.word2[token] for token in vector if token in self.word2.wv.key_to_index.keys()]
-#         return np.mean(vector) if vector != [] else 0
-# ################################################################################################
-#     ## Выборка слов из датасета, и подача их на вход 
-#     def fit(self, X:pd.DataFrame, y:pd.Series or List[float]):
-#         for column in self.columns: 
-#             filtered = [self.refactor_string(str(i)) for i in X[column]]
-#             self.word2[column] = Word2Vec(sentences=filtered, epochs=5000, 
-#                                     min_count=1, window=5, vector_size=1,
-#                                     sg=1, cbow_mean=1, alpha=0.1,
-#                                     seed=self.seed)
+    def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
+        self.current_columns = self.columns if self.columns != None else X.columns
+        self.imputer.fit(X[self.current_columns])
+        shelve_save(self.imputer, 'Simplevemputer')
+        return self
 
-#             word_vac = [self.word2[column].wv[i] for i in self.word2[column].wv.key_to_index.values()]
-#             self.len_sentence[column] = max([len(sentence) for sentence in filtered]) 
-#             self.mean_word[column] = np.mean(word_vac)                                  
+    def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
+        self.imputer = shelve_load('SimpleveImputer')
+        X_transform = pd.DataFrame(self.imputer.transform(X[self.current_columns]), columns = self.current_columns)
+        for column in self.current_columns:
+            X[column] = X_transform[column].values
+        return X
 
-#         if not os.path.exists('model_new_property'):
-#             os.makedirs('model_new_property')
-#         with open('model_new_property/len_sentence', 'wb') as file:
-#             pickle.dump(self.len_sentence, file)
-#         with open('model_new_property/mean_word', 'wb') as file:
-#             pickle.dump(self.mean_word, file)
-#         with open('model_new_property/word2', 'wb') as file:
-#             pickle.dump(self.word2, file)
+class ImputerIterative():
+    current_columns = None
+    def __init__(self, columns:List[str] or None = None):
+        self.columns = columns
+        self.imputer = IterativeImputer()
 
-#         return self
+    def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
+        self.current_columns = self.columns if self.columns != None else X.columns
+        self.imputer.fit(X[self.current_columns])
+        shelve_save(self.imputer, 'IterativeImputer')
+        return self
 
-#     def transform(self, X:pd.DataFrame, y = None)->pd.Series:
-#         with open('model_new_property/len_sentence', 'rb') as file:
-#             self.len_sentence = pickle.load(file)
-#         with open('model_new_property/mean_word', 'rb') as file:
-#             self.mean_word = pickle.load(file)
-#         with open('model_new_property/word2', 'rb') as file:
-#             self.word2 = pickle.load(file)
+    def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
+        self.imputer = shelve_load('IterativeImputer')
+        X_transform = pd.DataFrame(self.imputer.transform(X[self.current_columns]), columns = self.current_columns)
+        for column in self.current_columns:
+            X[column] = X_transform[column].values
+        return X
 
-#         for column in self.columns:
-#             X[column] = list([self.get_vector_sentence(val, column) for val in X[column]])
-#         return X
+##############################################################################
 
-# class Imputer():
+class CheckXY():
+    def __init__(self, 
+                 print_data:bool = True, 
+                 export:bool = False, 
+                 file_name:List[str] = ["X_check.xlsx", "Y_check.xlsx"]):
+
+        self.print_data= print_data
+        self.export = export
+        self.file_name = file_name
+
+    def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
+        return self
+
+    def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
+        print('*'*100)
+        if self.print_data:
+            print(X)
+        if self.export:
+            X.to_excel(self.file_name[0])
+        print('*'*100)
+        return X
+
+    def target_transform(self, Y:pd.DataFrame) -> pd.DataFrame or pd.Series or List[float or int]:
+        if self.print_data:
+            print(Y)
+            print('*'*100)
+        if self.export:
+            Y.to_excel(self.file_name[0])
+        return Y
