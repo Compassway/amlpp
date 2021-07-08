@@ -49,24 +49,26 @@ class CategoricalEncoder():
 
     def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
         for column in self.columns:
-            self.encoder[column] = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=np.nan)
-            X_fit = pd.DataFrame(X[column].loc[~X[column].isnull()])
-            if len(X_fit) > 0:
-                self.encoder[column].fit(X_fit)
-                X_transform = self.encoder[column].transform(pd.DataFrame(X_fit))
-                self.encoder[column].unknown_value = self.fill_value(X_transform)
-            else:
-                self.encoder[column] = False
+            if column in X.columns:
+                self.encoder[column] = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=np.nan)
+                X_fit = pd.DataFrame(X[column].loc[~X[column].isnull()])
+                if len(X_fit) > 0:
+                    self.encoder[column].fit(X_fit)
+                    X_transform = self.encoder[column].transform(pd.DataFrame(X_fit))
+                    self.encoder[column].unknown_value = self.fill_value(X_transform)
+                else:
+                    self.encoder[column] = False
         shelve_save(self.encoder, 'CategoricalEncoder')
         return self
 
     def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
         self.encoder = shelve_load('CategoricalEncoder')
         for column in self.columns:
-            if self.encoder[column]:
-                X[column] = self.encoder[column].transform(pd.DataFrame(X[column].fillna('NAN')))
-            else:
-                del X[column]
+            if column in X.columns:
+                if self.encoder[column]:
+                    X[column] = self.encoder[column].transform(pd.DataFrame(X[column].fillna('NAN')))
+                else:
+                    del X[column]
         return X
     def return_fill_value(self, trash):
         return self.user_value
@@ -132,11 +134,11 @@ class ImputerValue():
     def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
         self.current_columns = self.columns if self.columns != None else X.columns
         self.imputer.fit(X[self.current_columns])
-        shelve_save(self.imputer, 'Simplevemputer')
+        shelve_save(self.imputer, 'SimpleImputer')
         return self
 
     def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
-        self.imputer = shelve_load('SimpleveImputer')
+        self.imputer = shelve_load('SimpleImputer')
         X_transform = pd.DataFrame(self.imputer.transform(X[self.current_columns]), columns = self.current_columns)
         for column in self.current_columns:
             X[column] = X_transform[column].values
@@ -149,6 +151,9 @@ class ImputerIterative():
         self.imputer = IterativeImputer()
 
     def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
+        for column in X:
+            if len(X.loc[X[column].isnull()]) == len(X):
+                X[column] = [0 for i in range(len(X))]
         self.current_columns = self.columns if self.columns != None else X.columns
         self.imputer.fit(X[self.current_columns])
         shelve_save(self.imputer, 'IterativeImputer')
@@ -160,35 +165,3 @@ class ImputerIterative():
         for column in self.current_columns:
             X[column] = X_transform[column].values
         return X
-
-##############################################################################
-
-class CheckXY():
-    def __init__(self, 
-                 print_data:bool = True, 
-                 export:bool = False, 
-                 file_name:List[str] = ["X_check.xlsx", "Y_check.xlsx"]):
-
-        self.print_data= print_data
-        self.export = export
-        self.file_name = file_name
-
-    def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
-        return self
-
-    def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
-        print('*'*100)
-        if self.print_data:
-            print(X)
-        if self.export:
-            X.to_excel(self.file_name[0])
-        print('*'*100)
-        return X
-
-    def target_transform(self, Y:pd.DataFrame) -> pd.DataFrame or pd.Series or List[float or int]:
-        if self.print_data:
-            print(Y)
-            print('*'*100)
-        if self.export:
-            Y.to_excel(self.file_name[0])
-        return Y
