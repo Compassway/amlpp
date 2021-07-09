@@ -1,1 +1,1 @@
-from ._data import Conveyor
+from ._base import Conveyor
