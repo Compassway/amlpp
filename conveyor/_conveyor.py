@@ -1,7 +1,9 @@
 from sklearn.inspection import permutation_importance
 from sklearn.pipeline import Pipeline, make_pipeline
 
-from AMLpp.additional.secondary_functions import lead_time
+import sys
+sys.path.insert(0,'C:\\Users\\analytic6\\Desktop\\Work Space Analitic 6 (Asir)')
+sys.path.insert(0,'C:\\Users\\User\\Desktop\\work')
 
 from typing import List, Callable
 
@@ -9,9 +11,13 @@ import matplotlib.pyplot as plt
 
 from tpot import TPOTRegressor
 
+from datetime import datetime
 import pandas as pd
+import warnings
 import pickle
 import shap
+
+import tqdm 
 
 ##############################################################################
 class Conveyor:
@@ -28,13 +34,30 @@ class Conveyor:
 
     def __init__(self, *blocks, **params):
         self.blocks = list(blocks)
+        self.iter = 0
+        warnings.filterwarnings('ignore')
         
     def __repr__(self):
-        text_repr = "STRUCTURE MODEL:\n"
-        for iter in range(len(self.blocks)):
-            text_repr += "{}. {} \n".format(iter,  repr(self.blocks[iter]))
-        return text_repr
+        _repr = self.__class__.__name__ + "= (\n"
+        indent = " " * (len(_repr) - 1)
+        for block in self.blocks:
+            _repr += "{}{}, \n".format(indent, repr(block))
+        _repr = _repr[:-3] + "\n{} )".format(indent)
+        return _repr
 
+    def __next__(self):
+        if self.iter < len(self.blocks):
+            self.iter +=1 
+            return self.block[iter]
+        else:
+            self.iter = 0
+            return StopIteration
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            return self.__class__(self.blocks[key])
+        else:
+            return self.blocks[key]
     ##############################################################################
 
     # @lead_time
@@ -55,10 +78,14 @@ class Conveyor:
 
     def _fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
         X_, Y_  = (X.copy(), Y.copy())
-        for block in self.blocks[:-1]:
-            print(block)
+
+        pbar = tqdm.tqdm(self.blocks[:-1])
+        for block in pbar:
+            pbar.set_postfix({'transform': block.__class__.__name__})
             block.fit(X_, Y_)
             X_, Y_ = self._transform(block, X_, Y_)
+        pbar.close()
+        
         self.blocks[-1].fit(X_, Y_)
         return X_, Y_
     ##############################################################################
@@ -93,7 +120,8 @@ class Conveyor:
                 X:pd.DataFrame,
                 Y:pd.DataFrame or pd.Series,
                 sklearn_function:List[str] = ['roc_auc_score', 'r2_score', 'accuracy_score'],
-                precision_function:List[Callable] = []):
+                precision_function:List[Callable] = [],
+                _return:bool = False):
         """
         X:pd.DataFrame,
         Y:pd.DataFrame or pd.Series,
@@ -102,19 +130,23 @@ class Conveyor:
         """
         X_, Y_ = self.transform(X.copy(), Y.copy())
         result = self.blocks[-1].predict(X_)
+        score = ""
         for func in sklearn_function:
             try:
                 exec('from sklearn.metrics import ' + func)
-                print("function - {} = ".
-                        format(func), eval("{}(Y_, result)".format(func)))
+                score += "function - {} = {}\n".format(func, eval("{}(Y_, result)".format(func)))
             except Exception as e:
-                print("function - {} = ERROR: {}".format(func, e))
+                score += "function - {} = ERROR: {}\n".format(func, e)
         for func in precision_function:
             try:
-                print("function - {} = ".
-                        format(func.__name__), func(Y_, result))
+                score = "function - {} = {}\n".format(func.__name__, func(Y_, result))
             except Exception as e:
-                print("function - {} = ERROR: {}".format(func.__name__, e))
+                score = "function - {} = ERROR: {}\n".format(func.__name__, e)
+
+        if _return:
+            return score, result, Y_
+        else:
+            print(score)
     # @lead_time
     def feature_importances(self,
                             X:pd.DataFrame,
@@ -152,12 +184,14 @@ class Conveyor:
     def fit_model(self, 
                     X:pd.DataFrame, Y:pd.DataFrame or pd.Series,
                     type_model:str = 'regressor', estimator:bool = False,
+                    export_model:str = "default",
+                    
                     generations:int = 5, population_size:int = 50, n_jobs:int = -1):
 
         tpot = TPOTRegressor(generations=generations, 
                              population_size=population_size,
                              n_jobs = n_jobs,
-                            random_state=42)
+                             random_state=42)
                             
         X_, Y_ = self.fit_transform(X, Y) if not estimator else self._fit(X, Y)
         print('start fit model !!!!')
@@ -179,9 +213,21 @@ class Conveyor:
             
         self.blocks[-1].fit(X_, Y_)
         print(self.blocks)
-        with open('export_model', 'wb') as save_file:
-            pickle.dump(self, save_file)
+        if export_model != "":
+            if export_model == "default":
+                export_model = "model_" + datetime.now().strftime("%Y_%m_%d_m%M")
+            with open(export_model, 'wb') as save_file:
+                pickle.dump(self, save_file)
     ##############################################################################
     # @lead_time
     def export(self):
-        pass
+        dc = {}
+        for iter, i in zip(range(len(self.blocks)),self.blocks):
+            dc[iter] = i
+        with open ('ss', 'wb') as file:
+            pickle.dump(self, file)
+    def load(self):
+        with open ('ss', 'rb') as file:
+            dct = pickle.load(file)
+        for iter, i in zip(range(len(self.blocks)),self.blocks):
+            self.blocks[iter] = i
