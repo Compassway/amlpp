@@ -33,9 +33,10 @@ class Experimenter():
         with open(self.path_experiment + "/model", 'wb') as file:
             pickle.dump(model, file)
         self.model = model
-
-        self.add_description(description + "\ntrainset = {}".format(trainset), 'w')
-        if X_test:
+        description += "\ntrainset = {}".format(trainset)
+        description +=  "\n" + repr(self.model)
+        self.add_description(description, 'w')
+        if type(X_test) == pd.DataFrame:
             self.make_experiment(X_test, Y_test, testset_name,
                         feature_importances = feature_importances, X_test_features = X_test_features)
 
@@ -49,7 +50,7 @@ class Experimenter():
                             X_test_features:List[str] = None):
         if self.model:
             score, pred, Y = self.model.score(X_test, Y_test, _return = True) 
-            description = "\n*"*60
+            description =  '\n' +"*"*60
             description += "\ntestset = " + testset_name
             description += "\n" + score
             description += add_description
@@ -68,7 +69,7 @@ class Experimenter():
             print("Connect to existing experimnet or create experiment !")
 
     def add_description(self, add_description:str, mod:str = "a"):
-        with open(self.path_experiment + "/desc.txt", mod) as file:
+        with open(self.path_experiment + "/desc.txt", mod, encoding="utf-8") as file:
             file.write(add_description)
 
     def _load_model(self) -> Conveyor:

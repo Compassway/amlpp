@@ -36,11 +36,14 @@ class CategoricalEncoder(BaseTransform):
                 if len(X_fit) > 0:
                     self.encoder[column].fit(X_fit)
                 else:
-                    del self.encoder[column]
+                    self.encoder[column] = False
         return self
 
     def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
         for column in self.encoder:
             if column in X.columns:
-                X[column] = self.encoder[column].transform(pd.DataFrame(X[column].fillna('NAN')))
+                if self.encoder[column]:
+                    X[column] = self.encoder[column].transform(pd.DataFrame(X[column].fillna('NAN')))
+                else:
+                    del X[column]
         return X
