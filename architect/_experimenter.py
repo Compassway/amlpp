@@ -63,7 +63,8 @@ class Experimenter():
             result_data.to_excel(self.path_experiment + "/{}.xlsx".format(testset_name))
             
             if feature_importances:
-                pass
+                plot_path = self.path_experiment + "/{}.jpeg".format(testset_name)
+                self.model.feature_importances(X_test, Y_test, save = True, name_plot = plot_path)
         else:
             print("You need to start to the experiment !")
             print("Connect to existing experimnet or create experiment !")

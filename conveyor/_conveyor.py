@@ -152,6 +152,8 @@ class Conveyor:
                             X:pd.DataFrame,
                             Y:pd.DataFrame or pd.Series, 
                             show:str = 'all', # all, sklearn, shap
+                            save:bool = True,
+                            name_plot:str = "",
                             transform = True): 
                             
         if transform:
@@ -162,7 +164,11 @@ class Conveyor:
             try:
                 explainer = shap.Explainer(estimator)
                 shap_values = explainer(X_)
-                shap.plots.bar(shap_values[0])
+                shap.plots.bar(shap_values[0], show = False)
+                if save:
+                    name_plot = name_plot if name_plot != "" else datetime.now().strftime("%Y-%m-%d_%M")
+                    plt.savefig('{}_shap.jpeg'.format(name_plot), dpi = 150,  pad_inches=0)
+                plt.show()
             except Exception as e:
                 print('shap plot - ERROR: ', e)
 
@@ -176,6 +182,9 @@ class Conveyor:
                 ax.set_title("Feature importances using permutation on full model")
                 ax.set_ylabel("Mean accuracy decrease")
                 fig.tight_layout()
+                if save:
+                    name_plot = name_plot if name_plot != "" else datetime.now().strftime("%Y-%m-%d_%M")
+                    plt.savefig('{}_sklearn.jpeg'.format(name_plot))
                 plt.show()
             except Exception as e:
                 print('Sklearn plot - ERROR: ', e)
