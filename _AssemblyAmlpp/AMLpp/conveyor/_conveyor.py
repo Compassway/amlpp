@@ -227,16 +227,3 @@ class Conveyor:
                 export_model = "model_" + datetime.now().strftime("%Y_%m_%d_m%M")
             with open(export_model, 'wb') as save_file:
                 pickle.dump(self, save_file)
-    ##############################################################################
-    # @lead_time
-    def export(self):
-        dc = {}
-        for iter, i in zip(range(len(self.blocks)),self.blocks):
-            dc[iter] = i
-        with open ('ss', 'wb') as file:
-            pickle.dump(self, file)
-    def load(self):
-        with open ('ss', 'rb') as file:
-            dct = pickle.load(file)
-        for iter, i in zip(range(len(self.blocks)),self.blocks):
-            self.blocks[iter] = i
