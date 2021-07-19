@@ -1,7 +1,10 @@
+from sklearn.metrics import r2_score, mean_squared_error
 from sklearn.inspection import permutation_importance
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline, make_pipeline
 
 import sys
+sys.path.insert(0, "C:\\Users\\analytic6\\Desktop\\Work Space Analitic 6 (Asir)\\AMLpp\\_AssemblyAmlpp\\AMLpp")
 sys.path.insert(0,'C:\\Users\\analytic6\\Desktop\\Work Space Analitic 6 (Asir)')
 sys.path.insert(0,'C:\\Users\\User\\Desktop\\work')
 
@@ -9,13 +12,19 @@ from typing import List, Callable
 
 import matplotlib.pyplot as plt
 
+from lightgbm import LGBMRegressor
 from tpot import TPOTRegressor
 
+from additional import LGBOptimizer
+
 from datetime import datetime
+import lightgbm as lgb
 import pandas as pd
 import warnings
+import optuna
 import pickle
 import shap
+import time
 
 import tqdm 
 
@@ -32,32 +41,34 @@ class Conveyor:
 
     ##############################################################################
 
-    def __init__(self, *blocks, **params):
+    def __init__(self, *blocks, estimator:object  = None, **params):
         self.blocks = list(blocks)
-        self.iter = 0
+        self.estimator = estimator
+        # self.iter = 0
         warnings.filterwarnings('ignore')
         
     def __repr__(self):
         _repr = self.__class__.__name__ + "= (\n"
         indent = " " * (len(_repr) - 1)
         for block in self.blocks:
-            _repr += "{}{}, \n".format(indent, repr(block))
-        _repr = _repr[:-3] + "\n{} )".format(indent)
+            _repr += f"{indent}{repr(block)}, \n"
+        _repr += f"{indent}estimator = {repr(self.estimator)}"
+        _repr += f"\n{indent} )"
         return _repr
 
-    def __next__(self):
-        if self.iter < len(self.blocks):
-            self.iter +=1 
-            return self.block[iter]
-        else:
-            self.iter = 0
-            return StopIteration
+    # def __next__(self):
+    #     if self.iter < len(self.blocks):
+    #         self.iter +=1 
+    #         return self.block[iter]
+    #     else:
+    #         self.iter = 0
+    #         return StopIteration
 
-    def __getitem__(self, key):
-        if isinstance(key, slice):
-            return self.__class__(self.blocks[key])
-        else:
-            return self.blocks[key]
+    # def __getitem__(self, key):
+    #     if isinstance(key, slice):
+    #         return self.__class__(self.blocks[key])
+    #     else:
+    #         return self.blocks[key]
     ##############################################################################
 
     # @lead_time
@@ -70,23 +81,20 @@ class Conveyor:
 
     # @lead_time
     def fit_transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
-        X_, Y_  = (X.copy(), Y.copy())
-        for block in self.blocks:
-            block.fit(X_, Y_)
-            X_, Y_ = self._transform(block, X_, Y_)
-        return X_, Y_
+        return self._fit(X, Y)
 
     def _fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
         X_, Y_  = (X.copy(), Y.copy())
 
-        pbar = tqdm.tqdm(self.blocks[:-1])
+        pbar = tqdm.tqdm(self.blocks)
         for block in pbar:
             pbar.set_postfix({'transform': block.__class__.__name__})
             block.fit(X_, Y_)
             X_, Y_ = self._transform(block, X_, Y_)
+
+        pbar.set_postfix({'transform': self.estimator.__class__.__name__})
+        self.estimator.fit(X_, Y_)
         pbar.close()
-        
-        self.blocks[-1].fit(X_, Y_)
         return X_, Y_
     ##############################################################################
 
@@ -95,7 +103,7 @@ class Conveyor:
                         X:pd.DataFrame,
                         Y:pd.DataFrame or pd.Series = pd.DataFrame()):
         X_, Y_  = (X.copy(), Y.copy())
-        for block in self.blocks[:-1]:
+        for block in self.blocks:
             X_, Y_ = self._transform(block, X_, Y_)
         return X_, Y_
 
@@ -112,7 +120,7 @@ class Conveyor:
 
     # @lead_time
     def predict(self, X:pd.DataFrame):
-        return self.blocks[-1].predict(self.transform(X.copy())[0])
+        return self.estimator.predict(self.transform(X.copy())[0])
 
     ##############################################################################
     # @lead_time
@@ -129,7 +137,7 @@ class Conveyor:
         precision_function:List[Callable] = []
         """
         X_, Y_ = self.transform(X.copy(), Y.copy())
-        result = self.blocks[-1].predict(X_)
+        result = self.estimator.predict(X_)
         score = ""
         for func in sklearn_function:
             try:
@@ -158,11 +166,10 @@ class Conveyor:
                             
         if transform:
             X_, Y_ = self.transform(X.copy(), Y.copy())
-            estimator = self.blocks[-1][-1] if type(self.blocks[-1]) == Pipeline else self.blocks[-1]
 
         if show == 'all' or show == 'shap':
             try:
-                explainer = shap.Explainer(estimator)
+                explainer = shap.Explainer(self.estimator)
                 shap_values = explainer(X_)
                 shap.plots.bar(shap_values[0], show = False)
                 if save:
@@ -174,7 +181,7 @@ class Conveyor:
 
         if show == "all" or show == "sklearn":
             try:
-                result = permutation_importance(estimator, X_, Y_, n_repeats=2, random_state=42)
+                result = permutation_importance(self.estimator, X_, Y_, n_repeats=2, random_state=42)
                 index = X_.columns if type(X_) == pd.DataFrame else X.columns
                 forest_importances = pd.Series(result.importances_mean, index=index)
                 fig, ax = plt.subplots(figsize=(20, 10))
@@ -188,42 +195,71 @@ class Conveyor:
                 plt.show()
             except Exception as e:
                 print('Sklearn plot - ERROR: ', e)
+        if self.estimator.__class__.__name__ == "LGBMRegressor":
+            lgb.plot_importance(self.estimator, figsize=(20, 10))
+            plt.savefig('{}_lgb.jpeg'.format(name_plot))
+            plt.show()
     ##############################################################################
     # @lead_time
     def fit_model(self, 
                     X:pd.DataFrame, Y:pd.DataFrame or pd.Series,
-                    type_model:str = 'regressor', estimator:bool = False,
+                    X_test:pd.DataFrame = None, Y_test:pd.DataFrame = None,
+                    type_model:str = 'regressor',
                     export_model:str = "default",
-                    
-                    generations:int = 5, population_size:int = 50, n_jobs:int = -1):
+                    compare_model:bool = True,
+                    tpot_params:dict  = {"generations":5, "population_size":50, "n_jobs":-1},
+                    lgb_params:dict = {"n_trials":20,  "n_jobs" :-1}, categorical_columns:List[str] = []
+                    ):
 
-        tpot = TPOTRegressor(generations=generations, 
-                             population_size=population_size,
-                             n_jobs = n_jobs,
-                             random_state=42)
-                            
-        X_, Y_ = self.fit_transform(X, Y) if not estimator else self._fit(X, Y)
-        print('start fit model !!!!')
-        tpot.fit(X_, Y_)
-        make_pipe, import_libs = tpot.export('', get_pipeline=True)
 
-        exec(import_libs)
-        tpot_model = eval(make_pipe)
-        tpot_model = tpot_model if (type(tpot_model) == Pipeline) else make_pipeline(tpot_model)
+        X_train, Y_train = self.fit_transform(X, Y)
 
-        if estimator:
-            del self.blocks[-1]
-        
-        for step in tpot_model:
-            self.blocks.append(step)
-            self.blocks[-1].fit(X_, Y_)
-            if step != tpot_model[-1]:
-                X_, Y_ = self._transform(self.blocks[-1], X_, Y_)
+        if type(X_test) != type(None) and type(Y_test) != type(None):
+            X_test, Y_test = self.transform(X_test, Y_test)
+        else:
+            X_test, Y_test = X_train, Y_train
             
-        self.blocks[-1].fit(X_, Y_)
-        print(self.blocks)
+        print('start fit tpot model !!!!')
+        tpot_model, result = self.fit_model_tpot(X_train, Y_train, X_test, params = tpot_params)
+        tpot_score = r2_score(Y_test, result)
+        print(tpot_model,"\n",f"r2_score = {tpot_score}")
+        time.sleep(1)
+        print('start fit lgb model !!!!')
+        lgb_model, result = self.fit_model_lgb(X_train, Y_train, X_test, Y_test, 
+                                                categorical_columns = categorical_columns, params = lgb_params)
+        lgb_score = r2_score(Y_test, result)
+        print(lgb_model,"\n",f"r2_score = {lgb_score}")
+
+        if tpot_score > lgb_score:
+            for step in tpot_model.steps[:-1]:
+                self.blocks.append(step)
+            self.estimator = tpot_model[-1]
+            print("BEST Conveyor: TPOT")
+        else:
+            self.estimator = lgb_model
+            print("BEST Conveyor: LGB")
+            
+        print(self)
         if export_model != "":
             if export_model == "default":
                 export_model = "model_" + datetime.now().strftime("%Y_%m_%d_m%M")
             with open(export_model, 'wb') as save_file:
                 pickle.dump(self, save_file)
+
+    def fit_model_tpot(self, X:pd.DataFrame, Y:pd.DataFrame, X_test:pd.DataFrame, params:dict = {}):
+        tpot = TPOTRegressor(**params, random_state=42).fit(X, Y)
+        make_pipe, import_libs = tpot.export('', get_pipeline=True)
+        exec(import_libs)
+        model = eval(make_pipe)
+        model = model if (type(model) == Pipeline) else make_pipeline(model)
+        return model.fit(X, Y), model.predict(X_test) if type(X_test) == pd.DataFrame else False
+
+    def fit_model_lgb(self, X:pd.DataFrame, Y:pd.DataFrame, 
+                            X_test:pd.DataFrame, Y_test:pd.DataFrame, 
+                            categorical_columns:List[str] = None, params:dict = {}):
+        study = optuna.create_study(direction='maximize')
+        study.optimize(LGBOptimizer(X, Y, X_test, Y_test, categorical_columns = categorical_columns),
+                                        **params, show_progress_bar = False)
+        model = LGBMRegressor(**study.best_params, random_state=42).fit(X, Y)
+        result = model.predict(X_test) if type(X_test) == pd.DataFrame else False 
+        return model, result

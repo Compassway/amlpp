@@ -6,3 +6,6 @@ __pycache__/
 _AssemblyAmlpp/experiments/
 _AssemblyAmlpp/model_classic
 _AssemblyAmlpp/model
+_AssemblyAmlpp/model_2021_07_19_m28
+_AssemblyAmlpp/md
+.gitignore
