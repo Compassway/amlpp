@@ -3,3 +3,6 @@ main/config.yaml
 */*/__pycache__/
 */__pycache__/
 __pycache__/
+_AssemblyAmlpp/experiments/
+_AssemblyAmlpp/model_classic
+_AssemblyAmlpp/model

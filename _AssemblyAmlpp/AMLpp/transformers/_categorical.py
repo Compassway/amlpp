@@ -7,8 +7,6 @@ from typing import List
 import pandas as pd
 import numpy as np
 
-__all__ = ["echo", "surround", "reverse"]
-
 class CategoricalEncoder(BaseTransform):
 
     """ Класс кодирования категориальных данных, с заполнение пропусков на некоторое значение определенное сратегией
