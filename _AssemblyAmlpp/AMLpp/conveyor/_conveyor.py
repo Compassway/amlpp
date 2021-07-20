@@ -21,7 +21,10 @@ from datetime import datetime
 import lightgbm as lgb
 import pandas as pd
 import warnings
+
 import optuna
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
 import pickle
 import shap
 import time
@@ -208,7 +211,8 @@ class Conveyor:
                     export_model:str = "default",
                     compare_model:bool = True,
                     tpot_params:dict  = {"generations":5, "population_size":50, "n_jobs":-1},
-                    lgb_params:dict = {"n_trials":20,  "n_jobs" :-1}, categorical_columns:List[str] = []
+                    lgb_params:dict = {"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False},
+                     categorical_columns:List[str] = []
                     ):
 
 
@@ -252,14 +256,21 @@ class Conveyor:
         exec(import_libs)
         model = eval(make_pipe)
         model = model if (type(model) == Pipeline) else make_pipeline(model)
-        return model.fit(X, Y), model.predict(X_test) if type(X_test) == pd.DataFrame else False
+        return model.fit(X, Y), model.predict(X_test)
 
     def fit_model_lgb(self, X:pd.DataFrame, Y:pd.DataFrame, 
                             X_test:pd.DataFrame, Y_test:pd.DataFrame, 
                             categorical_columns:List[str] = None, params:dict = {}):
+
+        params_columns = {}
+        if categorical_columns != None:
+            all_columns = list(X.columns)
+            categorical_columns = [col for col in categorical_columns if col in all_columns]
+            params_columns = {"feature_name":all_columns, "categorical_feature":categorical_columns}
+
         study = optuna.create_study(direction='maximize')
-        study.optimize(LGBOptimizer(X, Y, X_test, Y_test, categorical_columns = categorical_columns),
-                                        **params, show_progress_bar = False)
-        model = LGBMRegressor(**study.best_params, random_state=42).fit(X, Y)
+        study.optimize(LGBOptimizer(X, Y, X_test, Y_test, params_columns = params_columns), **params)
+        model = LGBMRegressor(**study.best_params, n_estimators = 10000,  random_state=42, metric = 'rmse')
+        model.fit(X, Y, eval_set = [(X_test, Y_test)], verbose = False, **params_columns,  early_stopping_rounds = 300)
         result = model.predict(X_test) if type(X_test) == pd.DataFrame else False 
         return model, result

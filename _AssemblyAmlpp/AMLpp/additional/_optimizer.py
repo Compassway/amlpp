@@ -8,18 +8,13 @@ import pandas as pd
 
 class LGBOptimizer(object):
     def __init__(self, X_train:pd.DataFrame, Y_train:pd.DataFrame, 
-                       X_test:pd.DataFrame = None, Y_test:pd.DataFrame = None,
-                       categorical_columns:List[str] = []
+                       X_test:pd.DataFrame, Y_test:pd.DataFrame,
+                       params_columns:List[str]
                        ):
 
         self.X_train, self.Y_train = X_train, Y_train
         self.X_test, self.Y_test = X_test, Y_test
-        if categorical_columns != []:
-            self.all_columns = list(X_train.columns)
-            self.categorical_columns = [col for col in categorical_columns if col in self.all_columns]
-        else:
-            self.all_columns = None
-            self.categorical_columns = None
+        self.params_columns = params_columns
 
     def __call__(self, trial):
         params = {
@@ -36,13 +31,10 @@ class LGBOptimizer(object):
         'min_child_samples': trial.suggest_int('min_child_samples', 1, 300),
         'cat_smooth' : trial.suggest_int('cat_smooth', 1, 100)
         }
-        params_columns = {}
+        
         model = LGBMRegressor(**params)
 
-        if self.all_columns != None and self.categorical_columns != None:
-            params_columns = {"feature_name":self.all_columns, "categorical_feature":self.categorical_columns}
-
         model.fit(self.X_train, self.Y_train, eval_set = [(self.X_test, self.Y_test)], verbose = False, 
-                early_stopping_rounds=300, **params_columns)
+                **self.params_columns, early_stopping_rounds = 300)
 
         return r2_score(self.Y_test, model.predict(self.X_test))
