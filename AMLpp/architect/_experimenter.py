@@ -2,7 +2,7 @@ import sys
 sys.path.insert(0,'C:\\Users\\analytic6\\Desktop\\Work Space Analitic 6 (Asir)')
 sys.path.insert(0,'C:\\Users\\User\\Desktop\\work')
 
-from AMLpp.conveyor import Conveyor
+from amlpp.conveyor import Conveyor
 
 from typing import List
 import pandas as pd
