@@ -2,19 +2,26 @@ from sklearn.metrics import r2_score
 
 from lightgbm import LGBMRegressor
 
-from typing import List
+from typing import List, Callable
 
 import pandas as pd
+import os
 
 class LGBOptimizer(object):
     def __init__(self, X_train:pd.DataFrame, Y_train:pd.DataFrame, 
                        X_test:pd.DataFrame, Y_test:pd.DataFrame,
-                       params_columns:List[str]
+                       params_columns:List[str],
+                       rating_func:Callable,
+                       quantity_trials:int
                        ):
 
         self.X_train, self.Y_train = X_train, Y_train
         self.X_test, self.Y_test = X_test, Y_test
         self.params_columns = params_columns
+        self.rating_func = rating_func
+
+        self.iter = 0
+        self.quantity_trials = quantity_trials
 
     def __call__(self, trial):
         params = {
@@ -37,4 +44,8 @@ class LGBOptimizer(object):
         model.fit(self.X_train, self.Y_train, eval_set = [(self.X_test, self.Y_test)], verbose = False, 
                 **self.params_columns, early_stopping_rounds = 300)
 
-        return r2_score(self.Y_test, model.predict(self.X_test))
+        self.iter += 1
+        progress = round(self.iter/self.quantity_trials*100, 2)
+        score = self.rating_func(self.Y_test, model.predict(self.X_test))
+        print(f"[{self.iter}/{self.quantity_trials} - {progress}%] {self.rating_func.__name__} = {round(score,3)}, trials № {trial.number}")
+        return self.rating_func(self.Y_test, model.predict(self.X_test))
