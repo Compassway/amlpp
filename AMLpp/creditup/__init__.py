@@ -1,0 +1,1 @@
+from .statistic import get_scoring_table_statistic

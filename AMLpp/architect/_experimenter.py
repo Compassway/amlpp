@@ -32,7 +32,7 @@ class Experimenter():
             pickle.dump(model, file)
         self.model = model
 
-        description = description_model
+        description = description_model 
         description += f"\ntrainset = {description_trainset}"
         description +=  "\n" + repr(self.model)
 
