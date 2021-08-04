@@ -1,3 +1,4 @@
+from re import S
 from sklearn.metrics import r2_score, roc_auc_score, mean_squared_error
 from sklearn.inspection import permutation_importance
 from sklearn.model_selection import train_test_split
@@ -28,6 +29,7 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 import pickle
 import shap
 import time
+import gc
 
 import tqdm 
 
@@ -131,35 +133,36 @@ class Conveyor:
     def score(self,
                 X:pd.DataFrame,
                 Y:pd.DataFrame or pd.Series,
-                sklearn_function:List[str] = ['roc_auc_score', 'r2_score', 'accuracy_score'],
+                sklearn_function:List[str] = ['r2_score','roc_auc_score', 'accuracy_score', 'explained_variance_score'],
                 precision_function:List[Callable] = [],
                 _return:bool = False):
         """
         X:pd.DataFrame,
         Y:pd.DataFrame or pd.Series,
-        sklearn_function:List[str] = ['roc_auc_score', 'r2_score', 'accuracy_score'],
+        sklearn_function:List[str] = ['roc_auc_score', 'r2_score', 'accuracy_score', 'explained_variance_score'],
         precision_function:List[Callable] = []
         """
         X_, Y_ = self.transform(X.copy(), Y.copy())
         result = self.estimator.predict(X_)
+
         score = ""
         for func in sklearn_function:
-            try:
-                exec('from sklearn.metrics import ' + func)
-                score += "function - {} = {}\n".format(func, eval("{}(Y_, result)".format(func)))
-            except Exception as e:
-                score += "function - {} = ERROR: {}\n".format(func, e)
+            score += self._get_score(eval(func), Y_, result)
         for func in precision_function:
-            try:
-                score = "function - {} = {}\n".format(func.__name__, func(Y_, result))
-            except Exception as e:
-                score = "function - {} = ERROR: {}\n".format(func.__name__, e)
+            score += self._get_score(func, Y_, result)
 
         if _return:
             return score, result, Y_
         else:
             print(score)
-    # @lead_time
+    
+    def _get_score(func:Callable, y:List[float], result:List[float]) -> str:
+        try:
+            return f"function - {func.__name__} = {func(y, result)}\n"
+        except Exception as e:
+            return f"function - {func.__name__} = ERROR: {e}\n"
+
+        
     def feature_importances(self,
                             X:pd.DataFrame,
                             Y:pd.DataFrame or pd.Series, 
@@ -199,64 +202,64 @@ class Conveyor:
                 plt.show()
             except Exception as e:
                 print('Sklearn plot - ERROR: ', e)
+
         if self.estimator.__class__.__name__ == "LGBMRegressor":
             lgb.plot_importance(self.estimator, figsize=(20, 10))
             plt.savefig('{}_lgb.jpeg'.format(name_plot))
             plt.show()
+            
     ##############################################################################
-    # @lead_time
     def fit_model(self, 
                     X:pd.DataFrame, Y:pd.DataFrame or pd.Series,
                     X_test:pd.DataFrame = None, Y_test:pd.DataFrame = None,
-                    type_model:str = 'regressor',
-                    export_model:str = "default",
-                    compare_model:bool = True,
-                    rating_func:str = 'r2_score', # roc_auc_score
-                    tpot_params:dict  = {"generations":5, "population_size":50, "n_jobs":-1},
-                    lgb_params:dict = {"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False},
+                    rating_func:str = 'r2_score', # sklearn metrics
+                    tpot_params:dict  = {}, lgb_params:dict = {},
                     categorical_columns:List[str] = []
                     ):
 
+        rating_func = eval(rating_func)
         X_train, Y_train = self.fit_transform(X, Y)
 
-        if type(X_test) != type(None) and type(Y_test) != type(None):
+        # if type(X_test) != type(None) and type(Y_test) != type(None):
+        if not X_test is None and not Y_test is None:
             X_test, Y_test = self.transform(X_test, Y_test)
         else:
             X_test, Y_test = X_train, Y_train
         
-        rating_func = r2_score if rating_func == 'r2_score' else roc_auc_score
-        
-        print("*"*100,'\n','start fit lgb model !!!!')
-        lgb_model, result = self.fit_model_lgb(X_train, Y_train, X_test, Y_test, 
-                                                categorical_columns = categorical_columns, 
-                                                params = lgb_params,
-                                                rating_func = rating_func)
-        lgb_score = rating_func(Y_test, result)
-        print(lgb_model,"\n",f"{rating_func.__name__} = {lgb_score}")
-
-        print("*"*100,'\n','start fit tpot model !!!!')
+        #######################################################################
+        print("*"*100, '\n', 'start fit lgb model !!!!')
+        try:
+            lgb_model, result = self.fit_model_lgb(X_train, Y_train, X_test, Y_test, 
+                                                    categorical_columns = categorical_columns, 
+                                                    rating_func = rating_func,
+                                                    params = lgb_params)
+            lgb_score = rating_func(Y_test, result)
+            print(lgb_model,"\n",f"{rating_func.__name__} = {lgb_score}")
+        except:
+            lgb_score = 0
+            print("Error lgb optuna")
+        #######################################################################
+        print("*"*100, '\n', 'start fit tpot model !!!!')
         tpot_model, result = self.fit_model_tpot(X_train, Y_train, X_test, params = tpot_params)
         tpot_score = rating_func(Y_test, result)
-        print(tpot_model,"\n",f"{rating_func.__name__} = {tpot_score}")
-
+        print(tpot_model,"\n", f"{rating_func.__name__} = {tpot_score}")
+        #######################################################################
 
         if tpot_score > lgb_score:
             for step in tpot_model.steps[:-1]:
                 self.blocks.append(step)
             self.estimator = tpot_model[-1]
-            print("BEST Conveyor: TPOT")
         else:
             self.estimator = lgb_model
-            print("BEST Conveyor: LGB")
-            
-        print(self)
-        if export_model != "":
-            if export_model == "default":
-                export_model = "model_" + datetime.now().strftime("%Y_%m_%d_m%M")
-            with open(export_model, 'wb') as save_file:
-                pickle.dump(self, save_file)
+
+        print("*"*100, f'\nBest model = {self.estimator}')
+
+        with open("model_" + datetime.now().strftime("%Y_%m_%d_m%M"), 'wb') as save_file:
+            pickle.dump(self, save_file)
 
     def fit_model_tpot(self, X:pd.DataFrame, Y:pd.DataFrame, X_test:pd.DataFrame, params:dict = {}):
+        params = {**params, **{"generations":5, "population_size":50, "n_jobs":-1}}
+
         tpot = TPOTRegressor(**params, random_state=42).fit(X, Y)
         make_pipe, import_libs = tpot.export('', get_pipeline=True)
         exec(import_libs)
@@ -267,18 +270,18 @@ class Conveyor:
     def fit_model_lgb(self, X:pd.DataFrame, Y:pd.DataFrame, 
                             X_test:pd.DataFrame, Y_test:pd.DataFrame, 
                             categorical_columns:List[str] = None,
-                            params:dict = {},
-                            rating_func:Callable = r2_score):
+                            rating_func:Callable = r2_score,
+                            params:dict = {}):
+        params = {**params, **{"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False}}
 
-        params_columns = {}
-        if categorical_columns != None:
-            all_columns = list(X.columns)
-            categorical_columns = [col for col in categorical_columns if col in all_columns]
-            params_columns = {"feature_name":all_columns, "categorical_feature":categorical_columns}
+        params_columns = {"feature_name": list(X.columns)}
+        params_columns['categorical_feature'] = [col for col in categorical_columns if col in params_columns['feature_name']]
 
         study = optuna.create_study(direction='maximize')
-        study.optimize(LGBOptimizer(X, Y, X_test, Y_test, params_columns = params_columns, rating_func = rating_func, quantity_trials=params['n_trials']), **params)
+        study.optimize(LGBOptimizer(X, Y, X_test, Y_test, params_columns = params_columns,
+                                             rating_func = rating_func, quantity_trials=params['n_trials']),
+                                             callbacks=[lambda study, trial: gc.collect()], **params)
         model = LGBMRegressor(**study.best_params, n_estimators = 10000,  random_state=42, metric = 'rmse')
         model.fit(X, Y, eval_set = [(X_test, Y_test)], verbose = False, **params_columns,  early_stopping_rounds = 300)
-        result = model.predict(X_test) if type(X_test) == pd.DataFrame else False 
+        result = model.predict(X_test)
         return model, result

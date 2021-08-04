@@ -45,7 +45,10 @@ class LGBOptimizer(object):
                 **self.params_columns, early_stopping_rounds = 300)
 
         self.iter += 1
-        progress = round(self.iter/self.quantity_trials*100, 2)
         score = self.rating_func(self.Y_test, model.predict(self.X_test))
-        print(f"[{self.iter}/{self.quantity_trials} - {progress}%] {self.rating_func.__name__} = {round(score,3)}, trials № {trial.number}")
-        return self.rating_func(self.Y_test, model.predict(self.X_test))
+
+        progress = round(self.iter/self.quantity_trials*100, 2)
+        if progress % 20 == 0:
+            print(f"[{self.iter}/{self.quantity_trials} - {progress}%]")
+
+        return score

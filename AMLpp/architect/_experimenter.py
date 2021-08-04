@@ -3,7 +3,9 @@ sys.path.insert(0,'C:\\Users\\analytic6\\Desktop\\Work Space Analitic 6 (Asir)')
 sys.path.insert(0,'C:\\Users\\User\\Desktop\\work')
 
 from amlpp.conveyor import Conveyor
+from sklearn.metrics import roc_auc_score, accuracy_score, r2_score
 
+from datetime import datetime
 from typing import List
 import pandas as pd
 import pickle 
@@ -12,6 +14,7 @@ import os
 class Experimenter():
 
     def __init__(self, experiment:str):
+        self.experiment = experiment
         self.path_experiment = "experiments/" + experiment
         if not os.path.exists(self.path_experiment):
             os.makedirs(self.path_experiment)
@@ -21,50 +24,56 @@ class Experimenter():
             print("load model successful!" if self.model else "model not found!")
 
     def create_experiment(self, 
-                            model:Conveyor, 
-                            description:str,
-                            trainset:str, 
-                            X_test:pd.DataFrame = None, 
-                            Y_test:pd.DataFrame = None,
-                            testset_name:str = "",
-                            feature_importances:bool = True,
-                            X_test_features:List[str] = None):
+                            model:Conveyor,
+                            description_model:str,
+                            description_trainset:str):
 
         with open(self.path_experiment + "/model", 'wb') as file:
             pickle.dump(model, file)
         self.model = model
-        description += "\ntrainset = {}".format(trainset)
-        description +=  "\n" + repr(self.model)
-        self.add_description(description, 'w')
-        if type(X_test) == pd.DataFrame:
-            self.make_experiment(X_test, Y_test, testset_name,
-                        feature_importances = feature_importances, X_test_features = X_test_features)
 
+        description = description_model
+        description += f"\ntrainset = {description_trainset}"
+        description +=  "\n" + repr(self.model)
+
+        self.add_description(description, 'w')
         
     def make_experiment(self, 
                             X_test:pd.DataFrame,
-                            Y_test:pd.DataFrame = None, 
-                            testset_name:str = "", 
-                            add_description:str = "", 
-                            feature_importances:bool = True,
-                            X_test_features:List[str] = None):
+                            Y_test:pd.DataFrame,
+                            description:str = "",
+                            testset_name:str = "",
+                            X_test_features:List[str] = None,
+                            feature_importances:bool = True):
         if self.model:
-            score, pred, Y = self.model.score(X_test, Y_test, _return = True) 
+            x_, y_ = self.transform(X_test, Y_test)
+            res = self.estimator.predict(x_)
+            score = ""
+            for metr in (r2_score, roc_auc_score, accuracy_score):
+                try:
+                    score += f"function - {metr.__name__} = {metr(y_, res)}\n"
+                except Exception as e:
+                    score += f"function - {metr.__name__} = ERROR: {e}\n"
+
+            testset_name = f"({self.experiment})" + testset_name
+
             description =  '\n' +"*"*60
+            description += datetime.now()
+            description += "\n" + description
             description += "\ntestset = " + testset_name
-            description += "\n" + score
-            description += add_description
+            description += "\nScore: " + score
+            
             self.add_description(description)
             print(description)
 
             result_data = X_test[X_test_features] if X_test_features else pd.DataFrame()
-            result_data['target'] = Y
-            result_data['result'] = pred
-            result_data.to_excel(self.path_experiment + "/{}.xlsx".format(testset_name))
+            result_data['target'] = y_
+            result_data['result'] = res
+            result_data.to_excel(self.path_experiment + f"/{testset_name}.xlsx")
             
             if feature_importances:
-                plot_path = self.path_experiment + "/{}.jpeg".format(testset_name)
-                self.model.feature_importances(X_test, Y_test, save = True, name_plot = plot_path)
+                plot_path = self.path_experiment + f"/{testset_name}.jpeg"
+                self.model.feature_importances(x_, y_, save = True, name_plot = plot_path, transform = False)
         else:
             print("You need to start to the experiment !")
             print("Connect to existing experimnet or create experiment !")
