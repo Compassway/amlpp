@@ -7,3 +7,10 @@ model_2021_07_21_m39
 */__pycache__/
 *.jpeg
 experiments/
+model_2021_08_04_m27
+model_2021_08_04_m35
+model_2021_08_04_m40
+model_2021_08_04_m42
+model_2021_08_04_m47
+model_2021_08_05_m54
+.gitignore

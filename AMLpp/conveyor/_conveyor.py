@@ -5,9 +5,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline, make_pipeline
 
 import sys
-sys.path.insert(0, "C:\\Users\\analytic6\\Desktop\\Work Space Analitic 6 (Asir)\\AMLpp\\_AssemblyAmlpp\\AMLpp")
-sys.path.insert(0,'C:\\Users\\analytic6\\Desktop\\Work Space Analitic 6 (Asir)')
-sys.path.insert(0,'C:\\Users\\User\\Desktop\\work')
 
 from typing import List, Callable
 
@@ -16,7 +13,8 @@ import matplotlib.pyplot as plt
 from lightgbm import LGBMRegressor
 from tpot import TPOTRegressor
 
-from ..additional import LGBOptimizer
+# from ..additional import LGBOptimizer
+from ..fit_model import *
 
 from datetime import datetime
 import lightgbm as lgb
@@ -213,7 +211,7 @@ class Conveyor:
                     X:pd.DataFrame, Y:pd.DataFrame or pd.Series,
                     X_test:pd.DataFrame = None, Y_test:pd.DataFrame = None,
                     rating_func:str = 'r2_score', # sklearn metrics
-                    tpot_params:dict  = {}, lgb_params:dict = {},
+                    optuna_params:dict = {}, 
                     categorical_columns:List[str] = []
                     ):
 
@@ -224,64 +222,117 @@ class Conveyor:
         if not X_test is None and not Y_test is None:
             X_test, Y_test = self.transform(X_test, Y_test)
         else:
-            X_test, Y_test = X_train, Y_train
-        
+            X_test, X_test, Y_test, Y_test = train_test_split(X_train, Y_train, test_size = 0.1, random_state = 42)
         #######################################################################
-        print("*"*100, '\n', 'start fit lgb model !!!!')
-        try:
-            lgb_model, result = self.fit_model_lgb(X_train, Y_train, X_test, Y_test, 
-                                                    categorical_columns = categorical_columns, 
-                                                    rating_func = rating_func,
-                                                    params = lgb_params)
-            lgb_score = rating_func(Y_test, result)
-            print(lgb_model,"\n",f"{rating_func.__name__} = {lgb_score}")
-        except:
-            lgb_score = 0
-            print("Error lgb optuna")
-        #######################################################################
-        print("*"*100, '\n', 'start fit tpot model !!!!')
-        tpot_model, result = self.fit_model_tpot(X_train, Y_train, X_test, params = tpot_params)
+        # print("*"*100, '\n', 'start fit lgb model !!!!')
+        # lgb_model, result = self.fit_lgbm_model(X_train, Y_train, X_test, Y_test, 
+        #                                         categorical_columns = categorical_columns, 
+        #                                         rating_func = rating_func,
+        #                                         params = optuna_params)
+        # lgb_score = rating_func(Y_test, result)
+        # #######################################################################
+        # #######################################################################
+        # print("*"*100, '\n', 'start fit tpot model !!!!')
+        tpot_model, result = self.fit_sklearn_model(X_train, Y_train, X_test, Y_test, rating_func, optuna_params)
         tpot_score = rating_func(Y_test, result)
-        print(tpot_model,"\n", f"{rating_func.__name__} = {tpot_score}")
-        #######################################################################
+        print("*"*100)
+        print(tpot_model, f"\n{rating_func.__name__} = {tpot_score}")
+        # #######################################################################
+        # #######################################################################
 
-        if tpot_score > lgb_score:
-            for step in tpot_model.steps[:-1]:
-                self.blocks.append(step)
-            self.estimator = tpot_model[-1]
-        else:
-            self.estimator = lgb_model
+        # if tpot_score > lgb_score:
+        #     for step in tpot_model.steps[:-1]:
+        #         self.blocks.append(step)
+        #     self.estimator = tpot_model[-1]
+        # else:
+        #     self.estimator = lgb_model
 
-        print("*"*100, f'\nBest model = {self.estimator}')
+        # print("*"*100, f'\nBest model = {self.estimator}')
 
-        with open("model_" + datetime.now().strftime("%Y_%m_%d_m%M"), 'wb') as save_file:
-            pickle.dump(self, save_file)
+        # with open("model_" + datetime.now().strftime("%Y_%m_%d_m%M"), 'wb') as save_file:
+        #     pickle.dump(self, save_file)
+    ########################################################################################
+    def fit_sklearn_model(self, X:pd.DataFrame, Y:pd.DataFrame, 
+                            X_test:pd.DataFrame, Y_test:pd.DataFrame,
+                            rating_func:Callable = r2_score,
+                            params:dict = {}):
+        params = {**{"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False}, **params}
+        
+        best_model = {"model":object, "params":{}, "best_value":0}
+        # try:
+            # pbq = tqdm.tqdm(sklearn_models)
+            # for model in tqdm.tqdm(sklearn_models):
+        pb = bar(params['n_trials'] * len(sklearn_models))
+        for model in sklearn_models:
+            pb.set_postfix(model.__name__)
+            study = optuna.create_study(direction='maximize')
+            study.optimize(SklearnOptimizer(X, Y, X_test, Y_test, rating_func, params['n_trials'],
+                                        model, sklearn_models[model], pb = pb)
+                , callbacks=[lambda study, trial: gc.collect()], **params)
+            currrent_model = {"model":model, "params":study.best_params, "best_value":study.best_value}
 
-    def fit_model_tpot(self, X:pd.DataFrame, Y:pd.DataFrame, X_test:pd.DataFrame, params:dict = {}):
-        params = {**params, **{"generations":5, "population_size":50, "n_jobs":-1}}
+            # self._repr_dict_model(currrent_model)
+            if study.best_value > best_model['best_value']:
+                best_model = currrent_model.copy()                    
+        # except:
+        #     pass
 
-        tpot = TPOTRegressor(**params, random_state=42).fit(X, Y)
-        make_pipe, import_libs = tpot.export('', get_pipeline=True)
-        exec(import_libs)
-        model = eval(make_pipe)
-        model = model if (type(model) == Pipeline) else make_pipeline(model)
-        return model.fit(X, Y), model.predict(X_test)
+        model = best_model['model'](**best_model['params']).fit(X, Y)
+        result = model.predict(X_test)
+        return model, result
+    ########################################################################################
 
-    def fit_model_lgb(self, X:pd.DataFrame, Y:pd.DataFrame, 
+    def fit_lgbm_model(self, X:pd.DataFrame, Y:pd.DataFrame, 
                             X_test:pd.DataFrame, Y_test:pd.DataFrame, 
                             categorical_columns:List[str] = None,
                             rating_func:Callable = r2_score,
                             params:dict = {}):
-        params = {**params, **{"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False}}
+        params = {**{"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False}, **params}
 
         params_columns = {"feature_name": list(X.columns)}
         params_columns['categorical_feature'] = [col for col in categorical_columns if col in params_columns['feature_name']]
 
         study = optuna.create_study(direction='maximize')
-        study.optimize(LGBOptimizer(X, Y, X_test, Y_test, params_columns = params_columns,
-                                             rating_func = rating_func, quantity_trials=params['n_trials']),
-                                             callbacks=[lambda study, trial: gc.collect()], **params)
-        model = LGBMRegressor(**study.best_params, n_estimators = 10000,  random_state=42, metric = 'rmse')
+        study.optimize(
+                        LGBMOptimizer(X, Y, 
+                                    X_test, Y_test, 
+                                    rating_func, params['n_trials'], 
+                                    lightgbm_models[0], lightgbm_models[1],  params_columns)
+                                    ,
+                       callbacks=[lambda study, trial: gc.collect()], **params)
+        model = lightgbm_models[0](**study.best_params)
         model.fit(X, Y, eval_set = [(X_test, Y_test)], verbose = False, **params_columns,  early_stopping_rounds = 300)
         result = model.predict(X_test)
+
+        best_model = {"model":lightgbm_models[0], "params":study.best_params, "best_value":study.best_value}
+        self._repr_dict_model(best_model)
         return model, result
+
+    def _repr_dict_model(self, model:dict) -> str:
+        params = str(model['params'])[1:-1]
+        params = params.replace(':', " =").replace("'", "")
+        print(f"{model['model'].__name__}({params})\nbest_value = {model['best_value']}")
+
+
+class bar():
+    def __init__(self, n):
+        self.pbar = tqdm.tqdm(total = n)
+        self.postfix = ""
+    def set_postfix(self, postfix:str):
+        self.postfix = postfix
+        
+    def up(self):
+        self.pbar.set_postfix({'model':self.postfix}, refresh=True)
+        self.pbar.update(1)
+
+        #         pbar = tqdm.tqdm(self.blocks)
+        # for block in pbar:
+        #     pbar.set_postfix({'transform': block.__class__.__name__})
+        #     block.fit(X_, Y_)
+        #     X_, Y_ = self._transform(block, X_, Y_)
+
+        # pbar.set_postfix({'transform': self.estimator.__class__.__name__})
+        # if estimator:
+        #     self.estimator.fit(X_, Y_)
+        # pbar.close()
+        # return X_, Y_

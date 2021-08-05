@@ -1,1 +1,1 @@
-from ._optimizer import LGBOptimizer
+# from ._optimizer import Optimizer
