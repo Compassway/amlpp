@@ -34,7 +34,7 @@ class LGBOptimizer(object):
         'subsample': trial.suggest_categorical('subsample', [0.6,0.65,0.7,0.75,0.8,0.85]),
         'learning_rate': trial.suggest_categorical('learning_rate', [0.005,0.006,0.008,0.01,0.015,0.02,0.03]),
         'max_depth': trial.suggest_categorical('max_depth', [-1,10,20]),
-        'num_leaves' : trial.suggest_int('num_leaves', 1, 300),
+        'num_leaves' : trial.suggest_int('num_leaves', 5, 300),
         'min_child_samples': trial.suggest_int('min_child_samples', 1, 300),
         'cat_smooth' : trial.suggest_int('cat_smooth', 1, 100)
         }
