@@ -21,24 +21,22 @@ class Experimenter():
             self.model = self._load_model()
             print("load model successful!" if self.model else "model not found!")
 
-    def create_experiment(self, 
-                            model:Conveyor,
-                            description_model:str,
-                            description_trainset:str):
+    def create_experiment(self, model:Conveyor, 
+                          description_model:str, description_trainset:str):
 
         with open(self.path_experiment + "/model", 'wb') as file:
             pickle.dump(model, file)
+
         self.model = model
 
         description = description_model 
         description += f"\ntrainset = {description_trainset}"
-        description +=  "\n" + repr(self.model)
+        description += f"\n{repr(self.model)}"
 
         self.add_description(description, 'w')
         
     def make_experiment(self, 
-                            X_test:pd.DataFrame,
-                            Y_test:pd.DataFrame,
+                            X_test:pd.DataFrame, Y_test:pd.DataFrame,
                             description:str = "",
                             testset_name:str = "",
                             X_test_features:List[str] = None,
@@ -55,8 +53,7 @@ class Experimenter():
 
             testset_name = f"({self.experiment})" + testset_name
 
-            description =  '\n' +"*"*60
-            description += datetime.now()
+            description =  '\n' +"*"*60 + datetime.now()
             description += "\n" + description
             description += "\ntestset = " + testset_name
             description += "\nScore: " + score
