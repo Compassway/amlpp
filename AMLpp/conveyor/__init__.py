@@ -1,1 +1,1 @@
-from ._conveyor import Conveyor
+from .conveyor import Conveyor
