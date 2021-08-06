@@ -13,10 +13,10 @@ class Optimizer(object):
 
         self.X_train, self.Y_train = X_train, Y_train
         self.X_test, self.Y_test = X_test, Y_test
+        self.model_params = model_params
         self.rating_func = rating_func
         self.tqdm_bar = tqdm_bar
         self.model = model
-        self.model_params = model_params
 
 class SklearnOptimizer(Optimizer):
     def __init__(self, X_train:pd.DataFrame, Y_train:pd.DataFrame, 

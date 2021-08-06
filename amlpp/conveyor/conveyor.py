@@ -31,13 +31,9 @@ class Conveyor:
         Объекты классов, что будут использоваться при обработке, и моделирование
 
     """
-
-    ##############################################################################
-
     def __init__(self, *blocks, estimator:object  = None, **params):
         self.blocks = list(blocks)
         self.estimator = estimator
-        # self.iter = 0
         warnings.filterwarnings('ignore')
         
     def __repr__(self):
@@ -45,26 +41,10 @@ class Conveyor:
         indent = " " * (len(_repr) - 1)
         for block in self.blocks:
             _repr += f"{indent}{repr(block)}, \n"
-        _repr += f"{indent}estimator = {repr(self.estimator)}"
-        _repr += f"\n{indent} )"
+        _repr += f"{indent}estimator = {repr(self.estimator)}\n{indent} )"
         return _repr
 
-    # def __next__(self):
-    #     if self.iter < len(self.blocks):
-    #         self.iter +=1 
-    #         return self.block[iter]
-    #     else:
-    #         self.iter = 0
-    #         return StopIteration
-
-    # def __getitem__(self, key):
-    #     if isinstance(key, slice):
-    #         return self.__class__(self.blocks[key])
-    #     else:
-    #         return self.blocks[key]
     ##############################################################################
-
-    # @lead_time
     def fit(self, X:pd.DataFrame,
                   Y:pd.DataFrame or pd.Series,
                   feature_importances:str = False):
@@ -72,27 +52,26 @@ class Conveyor:
         if feature_importances:
             self.feature_importances(X, Y, transform = False)
 
-    # @lead_time
     def fit_transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
         return self._fit(X, Y)
 
     def _fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series, estimator:bool = False):
         X_, Y_  = (X.copy(), Y.copy())
 
-        pbar = tqdm.tqdm(self.blocks)
-        for block in pbar:
-            pbar.set_postfix({'transform': block.__class__.__name__})
+        pbar = ProgressBar(len(self.blocks) + 1)
+        for block in self.blocks:
+            pbar.set_postfix('transform', block.__class__.__name__)
             block.fit(X_, Y_)
             X_, Y_ = self._transform(block, X_, Y_)
+            pbar.update()
 
-        pbar.set_postfix({'transform': self.estimator.__class__.__name__})
+        pbar.set_postfix('transform', self.estimator.__class__.__name__)
         if estimator:
             self.estimator.fit(X_, Y_)
-        pbar.close()
+        pbar.update()
         return X_, Y_
-    ##############################################################################
 
-    # @lead_time
+    ##############################################################################
     def transform(self,
                         X:pd.DataFrame,
                         Y:pd.DataFrame or pd.Series = pd.DataFrame()):
@@ -109,15 +88,12 @@ class Conveyor:
         if not Y.empty and 'target_transform' in dir(block):
             Y = block.target_transform(Y)
         return X, Y
-
+        
     ##############################################################################
-
-    # @lead_time
     def predict(self, X:pd.DataFrame):
         return self.estimator.predict(self.transform(X.copy())[0])
 
     ##############################################################################
-    # @lead_time
     def score(self,
                 X:pd.DataFrame,
                 Y:pd.DataFrame or pd.Series,
@@ -149,8 +125,8 @@ class Conveyor:
             return f"function - {func.__name__} = {func(y, result)}\n"
         except Exception as e:
             return f"function - {func.__name__} = ERROR: {e}\n"
-
         
+    ##############################################################################
     def feature_importances(self,
                             X:pd.DataFrame,
                             Y:pd.DataFrame or pd.Series, 
