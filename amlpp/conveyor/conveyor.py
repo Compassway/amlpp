@@ -1,6 +1,6 @@
+from sklearn.metrics import r2_score, roc_auc_score, accuracy_score, explained_variance_score
 from sklearn.inspection import permutation_importance
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score, roc_auc_score, accuracy_score
 
 from typing import List, Callable
 
@@ -45,30 +45,22 @@ class Conveyor:
         return _repr
 
     ##############################################################################
-    def fit(self, X:pd.DataFrame,
-                  Y:pd.DataFrame or pd.Series,
-                  feature_importances:str = False):
-        self._fit(X, Y, estimator = True)
-        if feature_importances:
-            self.feature_importances(X, Y, transform = False)
+    def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
+        _ = self.fit_transform(X, Y, estimator = True)
 
-    def fit_transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
-        return self._fit(X, Y)
-
-    def _fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series, estimator:bool = False):
+    def fit_transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series, estimator:bool = False):
         X_, Y_  = (X.copy(), Y.copy())
 
-        pbar = ProgressBar(len(self.blocks) + 1)
+        pbar = ProgressBar(len(self.blocks) + int(estimator))
         for block in self.blocks:
             pbar.set_postfix('transform', block.__class__.__name__)
-            block.fit(X_, Y_)
-            X_, Y_ = self._transform(block, X_, Y_)
+            X_, Y_ = self._transform(block.fit(X_, Y_), X_, Y_)
             pbar.update()
 
-        pbar.set_postfix('transform', self.estimator.__class__.__name__)
         if estimator:
+            pbar.set_postfix('transform', self.estimator.__class__.__name__)
             self.estimator.fit(X_, Y_)
-        pbar.update()
+            pbar.update()
         return X_, Y_
 
     ##############################################################################
@@ -120,7 +112,7 @@ class Conveyor:
         else:
             print(score)
     
-    def _get_score(func:Callable, y:List[float], result:List[float]) -> str:
+    def _get_score(self, func:Callable, y:List[float], result:List[float]) -> str:
         try:
             return f"function - {func.__name__} = {func(y, result)}\n"
         except Exception as e:

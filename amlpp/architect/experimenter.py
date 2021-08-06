@@ -8,6 +8,7 @@ import pandas as pd
 import pickle
 import os
 
+from .._creditup import get_scoring_table_statistic
 ##############################################################################
 class Experimenter():
 
@@ -39,8 +40,9 @@ class Experimenter():
                             X_test:pd.DataFrame, Y_test:pd.DataFrame,
                             description:str = "",
                             testset_name:str = "",
-                            X_test_features:List[str] = None,
-                            feature_importances:bool = True):
+                            X_test_features:List[str] = [],
+                            feature_importances:bool = True,
+                            scoring:bool = True):
         if self.model:
             x_, y_ = self.transform(X_test, Y_test)
             res = self.estimator.predict(x_)
@@ -65,6 +67,12 @@ class Experimenter():
             result_data['target'] = y_
             result_data['result'] = res
             result_data.to_excel(self.path_experiment + f"/{testset_name}.xlsx")
+
+            if scoring and 'status_id' in X_test.columns:
+                data_for_table = pd.DataFrame({"result":res, 'status_id':X_test['status_id']})
+                scoring_table = get_scoring_table_statistic(data_for_table)
+                result_data.to_excel(self.path_experiment + f"/{testset_name}_scoring.xlsx")
+
             
             if feature_importances:
                 plot_path = self.path_experiment + f"/{testset_name}.jpeg"

@@ -8,9 +8,11 @@ class ProgressBar():
         
     def set_postfix(self, name:str, postfix:str):
         self.postfix[name] = postfix
+        self.pbar.set_postfix(self.postfix)
         return self
+
     def update(self):
-        self.pbar.set_postfix(self.postfix, refresh=True)
+        self.pbar.set_postfix(self.postfix)
         self.pbar.update(1)
 
         if(self.pbar.n == self.pbar.total):
