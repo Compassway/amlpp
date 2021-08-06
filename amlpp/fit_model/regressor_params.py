@@ -42,22 +42,23 @@ def _decision_tree_regressor(trial):
 
 def _sgd_regressor(trial):
     return {'loss': trial.suggest_categorical('loss', ['squared_loss', 'huber', 'epsilon_insensitive']), 
+        'power_t': trial.suggest_categorical('power_t', [0.5, 0.0, 1.0, 0.1, 100.0, 10.0, 50.0]),
+        'learning_rate': trial.suggest_categorical('learning_rate', ['invscaling', 'constant']),
+        'l1_ratio': trial.suggest_categorical('l1_ratio', [0.25, 0.0, 1.0, 0.75, 0.5]),
+        'fit_intercept': trial.suggest_categorical('fit_intercept', [True, False]),
         'penalty': trial.suggest_categorical ('penalty', ['elasticnet']),
         'alpha': trial.suggest_categorical('alpha', [0.0, 0.01, 0.001]),
-        'learning_rate': trial.suggest_categorical('learning_rate', ['invscaling', 'constant']),
-        'fit_intercept': trial.suggest_categorical('fit_intercept', [True, False]),
-        'l1_ratio': trial.suggest_categorical('l1_ratio', [0.25, 0.0, 1.0, 0.75, 0.5]),
         'eta0': trial.suggest_categorical('eta0', [0.1, 1.0, 0.01]),
-        'power_t': trial.suggest_categorical('power_t', [0.5, 0.0, 1.0, 0.1, 100.0, 10.0, 50.0])}
-
+        'random_state': trial.suggest_int('random_state', 42, 42)}
+        
 def _xgb_regressor(trial):
-    return {'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100), 
-        'max_depth': trial.suggest_int('max_depth', 1, 11),
+    return {'learning_rate': trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
         'subsample': trial.suggest_categorical('subsample', np.arange(0.05, 1.01, 0.05)),
-        'learning_rate': trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
+        'objective': trial.suggest_categorical('objective', ['reg:squarederror']),
         'min_child_weight': trial.suggest_int('min_child_weight', 1, 21),
+        'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100), 
         'verbosity': trial.suggest_categorical('verbosity', [0]),
-        'objective': trial.suggest_categorical('objective', ['reg:squarederror'])}
+        'max_depth': trial.suggest_int('max_depth', 1, 11)}
 
 def _ridge_cv(trial):
     return {'alphas': trial.suggest_categorical('alphas', [1e-3, 1e-2, 1e-1, 1]),
@@ -65,27 +66,29 @@ def _ridge_cv(trial):
         'normalize': trial.suggest_categorical('min_child_weight', [True, False])}
 
 def _extra_trees_regressor(trial):
-    return {'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100),
-        'max_features': trial.suggest_categorical('max_features',  np.arange(0.05, 1.01, 0.05)),
+    return {'max_features': trial.suggest_categorical('max_features',  np.arange(0.05, 1.01, 0.05)),
         'min_samples_split': trial.suggest_int('min_samples_split', 2, 21),
+        'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100),
         'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 21),
-        'bootstrap': trial.suggest_categorical('bootstrap',  [True, False])}
+        'random_state': trial.suggest_int('random_state', 42, 42)}
 
 def _gradient_boosting_regressor(trial):
-    return {'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100),
-        'loss' : trial.suggest_categorical('loss', ["ls", "lad", "huber", "quantile"]),
-        'learning_rate' : trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
-        'max_depth' : trial.suggest_categorical('max_depth', range(1, 11)),
-        'min_samples_split' : trial.suggest_categorical('min_samples_split', range(2, 21)),
-        'min_samples_leaf' : trial.suggest_categorical('min_samples_leaf', range(1, 21)),
-        'subsample' : trial.suggest_categorical('subsample', np.arange(0.05, 1.01, 0.05)),
+    return {'learning_rate' : trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
         'max_features' : trial.suggest_categorical('max_features', np.arange(0.05, 1.01, 0.05)),
-        'alpha' : trial.suggest_categorical('alpha', [0.75, 0.8, 0.85, 0.9, 0.95, 0.99 ])}
+        'min_samples_split' : trial.suggest_categorical('min_samples_split', range(2, 21)),
+        'subsample' : trial.suggest_categorical('subsample', np.arange(0.05, 1.01, 0.05)),
+        'alpha' : trial.suggest_categorical('alpha', [0.75, 0.8, 0.85, 0.9, 0.95, 0.99 ]),
+        'min_samples_leaf' : trial.suggest_categorical('min_samples_leaf', range(1, 21)),
+        'loss' : trial.suggest_categorical('loss', ["ls", "lad", "huber", "quantile"]),
+        'max_depth' : trial.suggest_categorical('max_depth', range(1, 11)),
+        'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100),
+        'random_state': trial.suggest_int('random_state', 42, 42)}
 
 def _ada_boost_regressor(trial):
     return {'n_estimators' : trial.suggest_categorical('n_estimators', [100, 200, 300, 400, 500, 600]),
         'learning_rate' : trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
-        'loss' : trial.suggest_categorical('loss', ["linear", "square", "exponential"])}
+        'loss' : trial.suggest_categorical('loss', ["linear", "square", "exponential"]),
+        'random_state': trial.suggest_int('random_state', 42, 42)}
 
 def _kneighbors_regressor(trial):
     return {'n_neighbors' : trial.suggest_categorical('n_neighbors', range(1, 101)),
@@ -93,11 +96,12 @@ def _kneighbors_regressor(trial):
         'p' : trial.suggest_categorical('p', [1, 2])}
     
 def _linear_svr(trial):
-    return {'loss' : trial.suggest_categorical('loss', ["squared_epsilon_insensitive"]),
-        'dual' : trial.suggest_categorical('dual', [True, False]),
+    return {'C' : trial.suggest_categorical('C', [1e-4, 1e-3, 1e-2, 1e-1, 0.5, 1., 5., 10., 15., 20., 25.]),
+        'epsilon' : trial.suggest_categorical('epsilon', [1e-4, 1e-3, 1e-2, 1e-1, 1.]),
+        'loss' : trial.suggest_categorical('loss', ["squared_epsilon_insensitive"]),
         'tol' : trial.suggest_categorical('tol', [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]),
-        'C' : trial.suggest_categorical('C', [1e-4, 1e-3, 1e-2, 1e-1, 0.5, 1., 5., 10., 15., 20., 25.]),
-        'epsilon' : trial.suggest_categorical('epsilon', [1e-4, 1e-3, 1e-2, 1e-1, 1.])}
+        'dual' : trial.suggest_categorical('dual', [True, False]),
+        'random_state': trial.suggest_int('random_state', 42, 42)}
 
 sklearn_models = {
     RandomForestRegressor: _random_forest_regressor,

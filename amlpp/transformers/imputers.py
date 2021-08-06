@@ -11,6 +11,16 @@ from ._base_transform import BaseTransform
 
 ##############################################################################
 class Imputer(BaseTransform):
+    """Base Imputer class
+    Parameters
+    ----------
+    model: IterativeImputer or SimpleImputer
+        Model Iterative or Simple
+    columns: List [str] or None = None
+        The name of the columns in which the filling will be carried out
+    params: dict = {}
+        Parameters for fillers
+    """
     def __init__(self, model:IterativeImputer or SimpleImputer, 
                        columns:List[str] or None = None,
                        params:dict = {}):
@@ -34,6 +44,15 @@ class Imputer(BaseTransform):
         return X
 
 class ImputerValue(Imputer):
+    """ Imputer based on prediction
+    inserted values based on the rest of the data available
+    Parameters
+    ----------
+    columns: List [str] or None = None
+        The name of the columns in which the filling will be carried out
+    params: dict = {}
+        Parameters for fillers
+    """
     def __init__(self, columns:List[str] or None = None, **params):
         params = params if params != {} else \
                     {'strategy':'mean', 'missing_values':np.nan} 
@@ -41,6 +60,15 @@ class ImputerValue(Imputer):
 
 
 class ImputerIterative(Imputer):
+    """ Imputer based on simple values
+    inserted values based on the rest of the data available
+    Parameters
+    ----------
+    columns: List [str] or None = None
+        The name of the columns in which the filling will be carried out
+    params: dict = {}
+        Parameters for fillers
+    """
     def __init__(self, columns:List[str] or None = None, **params):
         params = params if params != {} else \
             {'max_iter':10, 'initial_strategy':'mean', 'missing_values':np.nan} 

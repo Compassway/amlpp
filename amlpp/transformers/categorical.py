@@ -8,23 +8,12 @@ from ._base_transform import BaseTransform
 
 ##############################################################################
 class CategoricalEncoder(BaseTransform):
-
-    """ Класс кодирования категориальных данных, с заполнение пропусков на некоторое значение определенное сратегией
-
+    """ Categorical encoder 
     Parameters
     ----------
-    columns : List[str]
-        Названия столбцов, которые будут подвегнуты обработке
-
-    straegy : str
-        Строка указывающая на используемую стратегию заполнения пропусков
-    
-    fill_value : float or str
-        Заполнитель, которым будут заполняться пропущенные значения,
-        при использование стратегии const
-        
-    """    
-
+    columns: List [str] 
+        Columns that encode 
+    """ 
     def __init__(self, columns:List[str]):
         super().__init__({'columns':columns})
         self.encoder = {column: OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value = np.nan) for column in columns}

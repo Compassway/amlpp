@@ -4,6 +4,7 @@ from sklearn.model_selection import train_test_split
 
 from typing import List, Callable
 
+from IPython.display import display
 from datetime import datetime
 
 import matplotlib.pyplot as plt
@@ -12,6 +13,7 @@ import pandas as pd
 import warnings
 import optuna
 import pickle
+import eli5
 import tqdm 
 import shap
 import time
@@ -23,15 +25,16 @@ from ..additional import *
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 ##############################################################################
 class Conveyor:
-    """ Подобие sklearn.Pipeline, адаптированный под простоту и добавленный функционал
-
+    """Conveyor consisting of blocks that carry processing of
+    data passing inside the conveyor, and ending with a regressor
     Parameters
     ----------
-    *block : object
-        Объекты классов, что будут использоваться при обработке, и моделирование
-
+    estimator : object = None
+        Regressor that performs the prediction task
+    * blocks : Transformes
+        Transformers that carry out data processing
     """
-    def __init__(self, *blocks, estimator:object  = None, **params):
+    def __init__(self, *blocks, estimator:object  = None):
         self.blocks = list(blocks)
         self.estimator = estimator
         warnings.filterwarnings('ignore')
@@ -46,9 +49,32 @@ class Conveyor:
 
     ##############################################################################
     def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
-        _ = self.fit_transform(X, Y, estimator = True)
+        """ Function that is responsible for filling the model with data and training the model
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data, features (regressors)
+        Y : pd.DataFrame or pd.Series
+            Input data, targets
+        """
+        _, __ = self.fit_transform(X, Y, estimator = True)
 
     def fit_transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series, estimator:bool = False):
+        """ Function that is responsible for filling the model with data and training the model, and returning the transformed
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data, features (regressors)
+        Y : pd.DataFrame or pd.Series
+            Input data, targets
+        estimator : bool
+            fit estimator or not
+
+        Returns
+        ----------
+        transformed data : list or pd.DataFrame
+            Transformed data
+        """
         X_, Y_  = (X.copy(), Y.copy())
 
         pbar = ProgressBar(len(self.blocks) + int(estimator))
@@ -67,6 +93,18 @@ class Conveyor:
     def transform(self,
                         X:pd.DataFrame,
                         Y:pd.DataFrame or pd.Series = pd.DataFrame()):
+        """ Сonducting input data through transformers
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data, features (regressors)
+        Y : pd.DataFrame or pd.Series
+            Input data, targets
+        Returns
+        ----------
+        transformed data : list or pd.DataFrame
+            Transformed data
+        """
         X_, Y_  = (X.copy(), Y.copy())
         for block in self.blocks:
             X_, Y_ = self._transform(block, X_, Y_)
@@ -76,6 +114,20 @@ class Conveyor:
                         block:Callable,
                         X:pd.DataFrame,
                         Y:pd.DataFrame or pd.Series = pd.DataFrame()):
+        """ Using a transformer
+        Parameters
+        ----------
+        block : Callable
+            Transformer
+        X : pd.DataFrame
+            Input data, features (regressors)
+        Y : pd.DataFrame or pd.Series
+            Input data, targets
+        Returns
+        ----------
+        transformed data : list or pd.DataFrame
+            Transformed data
+        """
         X = block.transform(X)
         if not Y.empty and 'target_transform' in dir(block):
             Y = block.target_transform(Y)
@@ -83,6 +135,16 @@ class Conveyor:
         
     ##############################################################################
     def predict(self, X:pd.DataFrame):
+        """ Getting the result
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data, features (regressors)
+        Returns
+        ----------
+        output : list
+            prediction
+        """
         return self.estimator.predict(self.transform(X.copy())[0])
 
     ##############################################################################
@@ -90,13 +152,18 @@ class Conveyor:
                 X:pd.DataFrame,
                 Y:pd.DataFrame or pd.Series,
                 sklearn_function:List[str] = ['r2_score','roc_auc_score', 'accuracy_score', 'explained_variance_score'],
-                precision_function:List[Callable] = [],
-                _return:bool = False):
-        """
-        X:pd.DataFrame,
-        Y:pd.DataFrame or pd.Series,
-        sklearn_function:List[str] = ['roc_auc_score', 'r2_score', 'accuracy_score', 'explained_variance_score'],
-        precision_function:List[Callable] = []
+                precision_function:List[Callable] = []):
+        """ Function of obtaining an estimate on test data
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data, features (regressors)
+        Y : pd.DataFrame or pd.Series
+            Input data, targets
+        sklearn_function : List [str] = ['r2_score','roc_auc_score', 'accuracy_score', 'explained_variance_score']
+            sklearn function to evaluate
+        precision_function : List [Callable] = []
+            custom evaluation functions
         """
         X_, Y_ = self.transform(X.copy(), Y.copy())
         result = self.estimator.predict(X_)
@@ -107,10 +174,7 @@ class Conveyor:
         for func in precision_function:
             score += self._get_score(func, Y_, result)
 
-        if _return:
-            return score, result, Y_
-        else:
-            print(score)
+        print(score)
     
     def _get_score(self, func:Callable, y:List[float], result:List[float]) -> str:
         try:
@@ -120,81 +184,121 @@ class Conveyor:
         
     ##############################################################################
     def feature_importances(self,
-                            X:pd.DataFrame,
-                            Y:pd.DataFrame or pd.Series, 
-                            show:str = 'all', # all, sklearn, shap
+                            X:pd.DataFrame, Y:pd.DataFrame or pd.Series, 
+                            show:str = ['sklearn', 'shap', 'lgbm', 'eli5'],
                             save:bool = True,
-                            name_plot:str = "",
-                            transform = True): 
-                            
-        if transform:
-            X_, Y_ = self.transform(X.copy(), Y.copy())
+                            name_plot:str = ""): 
+        """Plotting feature importances
+         Parameters
+         ----------
+         X : pd.DataFrame
+             Input data, features (regressors)
+         Y : pd.DataFrame or pd.Series
+             Input data, targets
+         show : str = 'all' variants = ['sklearn', 'shap', 'lgbm', 'eli5'] or ['all']
+             Type of graph shown
+         save : bool = True
+             Save graphs as images
+         name_plot: str = ""
+             Chart name
+         """
+        X_, Y_ = self.transform(X.copy(), Y.copy())
+        
+        name_plot = name_plot if name_plot != "" else datetime.now().strftime("%Y-%m-%d_%M")
 
-        if show == 'all' or show == 'shap':
+        if 'all' in show or 'eli5' in show:
+            try:
+                display(eli5.show_weights(self.estimator, feature_names = list(X_.columns)))
+                if save:
+                    df_weights = eli5.explain_weights_df(self.estimator, feature_names = list(X_.columns))
+                    df_weights.to_excel(f'{name_plot}_eli5.xlsx')
+            except Exception as e:
+                print('eli5 table - ERROR: ', e)
+
+        if 'all' in show  or 'shap' in show:
             try:
                 explainer = shap.Explainer(self.estimator)
                 shap_values = explainer(X_)
                 shap.plots.bar(shap_values[0], show = False)
                 if save:
-                    name_plot = name_plot if name_plot != "" else datetime.now().strftime("%Y-%m-%d_%M")
-                    plt.savefig('{}_shap.jpeg'.format(name_plot), dpi = 150,  pad_inches=0)
+                    plt.savefig(f'{name_plot}_shap.jpeg', dpi = 150,  pad_inches=0)
                 plt.show()
             except Exception as e:
                 print('shap plot - ERROR: ', e)
 
-        if show == "all" or show == "sklearn":
+        if "all" in show  or "sklearn" in show:
             try:
                 result = permutation_importance(self.estimator, X_, Y_, n_repeats=2, random_state=42)
                 index = X_.columns if type(X_) == pd.DataFrame else X.columns
                 forest_importances = pd.Series(result.importances_mean, index=index)
                 fig, ax = plt.subplots(figsize=(20, 10))
                 forest_importances.plot.bar(yerr=result.importances_std, ax=ax)
-                ax.set_title("Feature importances using permutation on full model")
-                ax.set_ylabel("Mean accuracy decrease")
                 fig.tight_layout()
                 if save:
-                    name_plot = name_plot if name_plot != "" else datetime.now().strftime("%Y-%m-%d_%M")
-                    plt.savefig('{}_sklearn.jpeg'.format(name_plot))
+                    plt.savefig(f'{name_plot}_sklearn.jpeg')
                 plt.show()
             except Exception as e:
                 print('Sklearn plot - ERROR: ', e)
 
-        if self.estimator.__class__.__name__ == "LGBMRegressor":
+        if ("all" in show  or "lgbm" in show) and self.estimator.__class__.__name__ == "LGBMRegressor":
             lgb.plot_importance(self.estimator, figsize=(20, 10))
-            plt.savefig('{}_lgb.jpeg'.format(name_plot))
+            if save:
+                plt.savefig(f'{name_plot}_lgb.jpeg')
             plt.show()
             
     ##############################################################################
     def fit_model(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series,
                     X_test:pd.DataFrame = None, Y_test:pd.DataFrame = None,
-                    rating_func:str = 'r2_score', optuna_params:dict = {}, 
-                    categorical_columns:List[str] = []):
-
+                    rating_func:str = 'r2_score', test_size:float = 0.1,
+                    optuna_params:dict = {}, categorical_columns:List[str] = []):
+        """ Model selection
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data, features (regressors)
+        Y : pd.DataFrame or pd.Series
+            Input data, targets
+        X_test : pd.DataFrame = None
+            Test input data, features (regressors)
+        Y_test : pd.DataFrame = None
+            Test input data, targets
+        test_size : float
+            test size if X_test and Y_test are missing
+        rating_func : str = 'r2_score' or "roc_auc_score"
+            Evaluation function for comparing the resulting models, and evaluating the fit of the lgb model using optuna
+        optuna_params : dict = {"n_trials": 100, "n_jobs": -1, 'show_progress_bar': False}
+            Optuna optimizer parameters for select sklearn and lgbm model
+        categorical_columns : List [str] = []
+            Category column names for lgbm optuna optimizer
+        """
         rating_func = eval(rating_func)
         X_train, Y_train = self.fit_transform(X, Y)
 
         if not X_test is None and not Y_test is None:
             X_test, Y_test = self.transform(X_test, Y_test)
         else:
-            X_test, X_test, Y_test, Y_test = train_test_split(X_train, Y_train, test_size = 0.1, random_state = 42)
+            X_train, X_test, Y_train, Y_test = train_test_split(X_train, Y_train, test_size = test_size, random_state = 42)
         #######################################################################
         lgb_model, result = self.fit_lgbm_model(X_train, Y_train, X_test, Y_test, 
                                                 categorical_columns = categorical_columns, 
                                                 rating_func = rating_func,
                                                 params = optuna_params)
         lgb_score = rating_func(Y_test, result)
+        print(lgb_score)
         # #######################################################################
         time.sleep(1)
         # #######################################################################
-        tpot_model, result = self.fit_sklearn_model(X_train, Y_train, X_test, Y_test, rating_func, optuna_params)
-        tpot_score = rating_func(Y_test, result)
+        sklearn_model, result = self.fit_sklearn_model(X_train, Y_train, X_test, Y_test, rating_func, optuna_params)
+        sklearn_score = rating_func(Y_test, result)
+        print(sklearn_score)
         # #######################################################################
-        self.estimator = tpot_model if tpot_score > lgb_score else lgb_model
+        self.estimator = sklearn_model if sklearn_score > lgb_score else lgb_model
         print("*"*100, f'\nBest model = {self.estimator}')
 
         with open("model_" + datetime.now().strftime("%Y_%m_%d_m%M"), 'wb') as save_file:
             pickle.dump(self, save_file)
 
+    ##############################################################################
     def fit_sklearn_model(self, X:pd.DataFrame, Y:pd.DataFrame, 
                             X_test:pd.DataFrame, Y_test:pd.DataFrame,
                             rating_func:Callable = r2_score, params:dict = {}):
@@ -219,7 +323,8 @@ class Conveyor:
         result = model.predict(X_test)
         self._repr_dict_model(best_model)
         return model, result
-
+        
+    ##############################################################################
     def fit_lgbm_model(self, X:pd.DataFrame, Y:pd.DataFrame, 
                             X_test:pd.DataFrame, Y_test:pd.DataFrame, 
                             rating_func:Callable = r2_score, params:dict = {}, 

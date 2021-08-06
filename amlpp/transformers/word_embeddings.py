@@ -20,6 +20,17 @@ stop_words = stopwords.words("russian")
 morph = pymorphy2.MorphAnalyzer()
 ##############################################################################
 class Word2Vectorization(BaseTransform):
+    """Class for transforming text data into numerical vectors
+    inserted values based on the rest of the data available
+    Parameters
+    ----------
+    columns: List [str] or None = None
+        Column names whose values will be vectorized
+    level_formatting: int = 1
+        Formatting level
+    params: dict = {}
+        Parameters for fillers
+    """
     def __init__(self, columns:List[str], level_formatting:int = 1, **params):
         self.level_formatting = level_formatting
         self.word2 = {column:None for column in columns}
@@ -42,6 +53,17 @@ class Word2Vectorization(BaseTransform):
         return X
 
     def refactor_string(self, string:str)->List[str]:
+        """ Function for refactoring a string, bringing it back to normal
+        Tokenization, getting rid of signs, etc.
+        Parameters
+        ----------
+        string: str
+            the string to be refactored
+        Returns
+        ----------
+        refactoring string: List [str] 
+            From refactoring a string and converting to an array of strings 
+        """
         string = string if str(string) != 'nan' else ""                          # Проверка на NAN
         string = word_tokenize(str(string).lower())                              # Нижний регистр и токенизация
         if self.level_formatting > 0:
@@ -53,6 +75,18 @@ class Word2Vectorization(BaseTransform):
         return string
 
     def mean_word2vec(self, sentence:str, column:str) ->List[float]:
+        """ Function of vectorization of proposals
+        Parameters
+        ----------
+        sentence: str
+            the sentence to be refactored
+        column: str
+            The name of the column to which the value belongs
+        Returns
+        ----------
+        vector sentence: List [str]
+            Vector clause representations
+        """
         vector = self.refactor_string(sentence)
         vector = [self.word2[column].wv[token] for token in vector if token in self.word2[column].wv.key_to_index.keys()]
         return np.mean(vector) if vector != [] else np.nan

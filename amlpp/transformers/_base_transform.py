@@ -2,6 +2,12 @@ from abc import ABC, abstractmethod
 
 ##############################################################################
 class BaseTransform(ABC):
+    """ Abstract class for transformers
+    Parameters
+    ----------
+    params: dict
+        Transformer parameters
+    """
     def __init__(self, params:dict):
         self.attr = params
         
