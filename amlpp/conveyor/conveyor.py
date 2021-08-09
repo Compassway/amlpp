@@ -284,13 +284,11 @@ class Conveyor:
                                                 rating_func = rating_func,
                                                 params = optuna_params)
         lgb_score = rating_func(Y_test, result)
-        print(lgb_score)
         # #######################################################################
         time.sleep(1)
         # #######################################################################
         sklearn_model, result = self.fit_sklearn_model(X_train, Y_train, X_test, Y_test, rating_func, optuna_params)
         sklearn_score = rating_func(Y_test, result)
-        print(sklearn_score)
         # #######################################################################
         self.estimator = sklearn_model if sklearn_score > lgb_score else lgb_model
         print("*"*100, f'\nBest model = {self.estimator}')
@@ -330,8 +328,11 @@ class Conveyor:
                             rating_func:Callable = r2_score, params:dict = {}, 
                             categorical_columns:List[str] = []):
         params = {**{"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False}, **params}
-        params_columns = {"feature_name": list(X.columns), 'early_stopping_rounds':300, 'verbose':False}
-        params_columns['categorical_feature'] = [col for col in categorical_columns if col in params_columns['feature_name']]
+        if type(X) == pd.DataFrame:
+            params_columns = {"feature_name": list(X.columns), 'early_stopping_rounds':300, 'verbose':False}
+            params_columns['categorical_feature'] = [col for col in categorical_columns if col in params_columns['feature_name']]
+        else:
+            params_columns = {}
 
         pb = ProgressFitModel(params['n_trials'])
         pb.set_postfix('model',"LGBMORegressor")
