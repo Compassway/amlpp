@@ -248,7 +248,7 @@ class Conveyor:
             
     ##############################################################################
     def fit_model(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series,
-                    X_test:pd.DataFrame = None, Y_test:pd.DataFrame = None,
+                    X_valid:pd.DataFrame = None, Y_valid:pd.DataFrame = None,
                     rating_func:str = 'r2_score', test_size:float = 0.1,
                     optuna_params:dict = {}, categorical_columns:List[str] = []):
         """ Model selection
@@ -258,12 +258,12 @@ class Conveyor:
             Input data, features (regressors)
         Y : pd.DataFrame or pd.Series
             Input data, targets
-        X_test : pd.DataFrame = None
+        X_valid : pd.DataFrame = None
             Test input data, features (regressors)
-        Y_test : pd.DataFrame = None
+        Y_valid : pd.DataFrame = None
             Test input data, targets
         test_size : float
-            test size if X_test and Y_test are missing
+            test size if X_valid and Y_valid are missing
         rating_func : str = 'r2_score' or "roc_auc_score"
             Evaluation function for comparing the resulting models, and evaluating the fit of the lgb model using optuna
         optuna_params : dict = {"n_trials": 100, "n_jobs": -1, 'show_progress_bar': False}
@@ -274,21 +274,21 @@ class Conveyor:
         rating_func = eval(rating_func)
         X_train, Y_train = self.fit_transform(X, Y)
 
-        if not X_test is None and not Y_test is None:
-            X_test, Y_test = self.transform(X_test, Y_test)
+        if not X_valid is None and not Y_valid is None:
+            X_valid, Y_valid = self.transform(X_valid, Y_valid)
         else:
-            X_train, X_test, Y_train, Y_test = train_test_split(X_train, Y_train, test_size = test_size, random_state = 42)
+            X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train, test_size = test_size, random_state = 42)
         #######################################################################
-        lgb_model, result = self.fit_lgbm_model(X_train, Y_train, X_test, Y_test, 
+        lgb_model, result = self.fit_lgbm_model(X_train, Y_train, X_valid, Y_valid, 
                                                 categorical_columns = categorical_columns, 
                                                 rating_func = rating_func,
                                                 params = optuna_params)
-        lgb_score = rating_func(Y_test, result)
+        lgb_score = rating_func(Y_valid, result)
         # #######################################################################
         time.sleep(1)
         # #######################################################################
-        sklearn_model, result = self.fit_sklearn_model(X_train, Y_train, X_test, Y_test, rating_func, optuna_params)
-        sklearn_score = rating_func(Y_test, result)
+        sklearn_model, result = self.fit_sklearn_model(X_train, Y_train, X_valid, Y_valid, rating_func, optuna_params)
+        sklearn_score = rating_func(Y_valid, result)
         # #######################################################################
         self.estimator = sklearn_model if sklearn_score > lgb_score else lgb_model
         print("*"*100, f'\nBest model = {self.estimator}')
