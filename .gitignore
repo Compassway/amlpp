@@ -3,5 +3,6 @@ AMLpp.egg-info/
 dist/
 .gitignore
 __pycache__/__init__.cpython-38.pyc
-.gitignore
-_assembly/
+*.xlsx
+*/*/__pycache__/
+_assembly/experiments/
