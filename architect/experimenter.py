@@ -85,7 +85,7 @@ class Experimenter():
 
             testset_name = f"({self.experiment})" + testset_name
 
-            description =  '\n' +"*"*60 + f"\n{datetime.now()}"
+            description =  '\n' +"*"*60 + f"\n{datetime.now()}\n{description}"
             description += "\ntestset = " + testset_name
             description += "\nScore: " + score
             
@@ -108,8 +108,8 @@ class Experimenter():
 
             
             if feature_importances:
-                plot_path = self.path_experiment + f"/{testset_name}.jpeg"
-                self.model.feature_importances(x_, y_, save = True, name_plot = plot_path, transform = False)
+                plot_path = self.path_experiment + f"/{testset_name}"
+                self.model.feature_importances(X_test, X_test, save = True, name_plot = plot_path)
         else:
             print("You need to start to the experiment !")
             print("Connect to existing experimnet or create experiment !")

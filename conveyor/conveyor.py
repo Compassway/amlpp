@@ -185,7 +185,7 @@ class Conveyor:
     ##############################################################################
     def feature_importances(self,
                             X:pd.DataFrame, Y:pd.DataFrame or pd.Series, 
-                            show:str = ['sklearn', 'shap', 'lgbm', 'eli5'],
+                            show:str = ['sklearn', 'eli5', "lgbm"],
                             save:bool = True,
                             name_plot:str = ""): 
         """Plotting feature importances
@@ -206,6 +206,12 @@ class Conveyor:
         
         name_plot = name_plot if name_plot != "" else datetime.now().strftime("%Y-%m-%d_%M")
 
+        if ("all" in show  or "lgbm" in show) and self.estimator.__class__.__name__ == "LGBMRegressor":
+            lgb.plot_importance(self.estimator, figsize=(20, 10))
+            if save:
+                plt.savefig(f'{name_plot}_lgb.jpeg')
+            plt.show()
+            
         if 'all' in show or 'eli5' in show:
             try:
                 display(eli5.show_weights(self.estimator, feature_names = list(X_.columns)))
@@ -239,12 +245,6 @@ class Conveyor:
                 plt.show()
             except Exception as e:
                 print('Sklearn plot - ERROR: ', e)
-
-        if ("all" in show  or "lgbm" in show) and self.estimator.__class__.__name__ == "LGBMRegressor":
-            lgb.plot_importance(self.estimator, figsize=(20, 10))
-            if save:
-                plt.savefig(f'{name_plot}_lgb.jpeg')
-            plt.show()
             
     ##############################################################################
     def fit_model(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series,
