@@ -54,8 +54,7 @@ class ImputerValue(Imputer):
         Parameters for fillers
     """
     def __init__(self, columns:List[str] or None = None, **params):
-        params = params if params != {} else \
-                    {'strategy':'mean', 'missing_values':np.nan} 
+        params = {'strategy':'mean', 'missing_values':np.nan, **params} 
         super().__init__(SimpleImputer, columns, params)
 
 
@@ -70,6 +69,5 @@ class ImputerIterative(Imputer):
         Parameters for fillers
     """
     def __init__(self, columns:List[str] or None = None, **params):
-        params = params if params != {} else \
-            {'max_iter':10, 'initial_strategy':'mean', 'missing_values':np.nan} 
+        params = {'max_iter':10, 'initial_strategy':'mean', 'missing_values':np.nan, **params} 
         super().__init__(IterativeImputer, columns, params)

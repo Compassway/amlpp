@@ -17,7 +17,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    packages=find_packages(),
+    packages=['additional', 'architect', 'conveyor', 'fit_model', 'transformers'],
     python_requires=">=3.6,<3.9",
     install_requires=[
         "scikit-learn",

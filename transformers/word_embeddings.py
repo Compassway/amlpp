@@ -34,10 +34,7 @@ class Word2Vectorization(BaseTransform):
     def __init__(self, columns:List[str], level_formatting:int = 1, **params):
         self.level_formatting = level_formatting
         self.word2 = {column:None for column in columns}
-
-        _params = {'epochs':5000, 'min_count':1, 'window':5, 'vector_size':20}
-        self.params = {key:params[key] if key in params else _params[key] for key in _params}
-
+        self.params = {'epochs':5000, 'min_count':1, 'window':5, 'vector_size':20, **params}
         super().__init__({'columns':columns, 'level_formatting':level_formatting, **self.params})
 
     def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):

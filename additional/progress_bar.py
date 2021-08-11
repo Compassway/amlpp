@@ -17,12 +17,15 @@ class ProgressBar():
 
         if(self.pbar.n == self.pbar.total):
             self.pbar.close()
+    
+    def close(self):
+        self.pbar.close()
 
 class ProgressFitModel(ProgressBar):
-    def __init__(self, n):
+    def __init__(self, n:int, best_value:float):
         super().__init__(n)
         self.postfix['model'] = ""
-        self.postfix['best_value'] = 0.
+        self.postfix['best_value'] = best_value
 
     def update(self, new_value:float, best_model:str):
         if new_value > self.postfix['best_value']:

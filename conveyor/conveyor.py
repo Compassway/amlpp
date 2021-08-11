@@ -10,6 +10,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import lightgbm as lgb
 import pandas as pd
+import numpy as np
 import warnings
 import optuna
 import pickle
@@ -248,9 +249,8 @@ class Conveyor:
             
     ##############################################################################
     def fit_model(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series,
-                    X_valid:pd.DataFrame = None, Y_valid:pd.DataFrame = None,
-                    rating_func:str = 'r2_score', test_size:float = 0.1,
-                    optuna_params:dict = {}, categorical_columns:List[str] = []):
+                    optuna_params:dict = {}, optimize_params:dict = {},
+                    categorical_columns:List[str] = []):
         """ Model selection
         Parameters
         ----------
@@ -258,95 +258,64 @@ class Conveyor:
             Input data, features (regressors)
         Y : pd.DataFrame or pd.Series
             Input data, targets
-        X_valid : pd.DataFrame = None
-            Test input data, features (regressors)
-        Y_valid : pd.DataFrame = None
-            Test input data, targets
-        test_size : float
-            test size if X_valid and Y_valid are missing
-        rating_func : str = 'r2_score' or "roc_auc_score"
-            Evaluation function for comparing the resulting models, and evaluating the fit of the lgb model using optuna
         optuna_params : dict = {"n_trials": 100, "n_jobs": -1, 'show_progress_bar': False}
             Optuna optimizer parameters for select sklearn and lgbm model
         categorical_columns : List [str] = []
             Category column names for lgbm optuna optimizer
         """
-        rating_func = eval(rating_func)
-        X_train, Y_train = self.fit_transform(X, Y)
+        optuna_params = {"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False, **optuna_params}
+        best_model = {"model":object, "params":{}, "best_value":0 }
+        X_, Y_ = self.fit_transform(X, Y)
 
-        if not X_valid is None and not Y_valid is None:
-            X_valid, Y_valid = self.transform(X_valid, Y_valid)
-        else:
-            X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train, test_size = test_size, random_state = 42)
-        #######################################################################
-        lgb_model, result = self.fit_lgbm_model(X_train, Y_train, X_valid, Y_valid, 
-                                                categorical_columns = categorical_columns, 
-                                                rating_func = rating_func,
-                                                params = optuna_params)
-        lgb_score = rating_func(Y_valid, result)
-        # #######################################################################
-        time.sleep(1)
-        # #######################################################################
-        sklearn_model, result = self.fit_sklearn_model(X_train, Y_train, X_valid, Y_valid, rating_func, optuna_params)
-        sklearn_score = rating_func(Y_valid, result)
-        # #######################################################################
-        self.estimator = sklearn_model if sklearn_score > lgb_score else lgb_model
+        # Дополнительные параметры для lgbm модели
+        params_columns = {'verbose':False}
+        if type(X_) == pd.DataFrame:
+            params_columns["feature_name"] =  list(X_.columns)
+            params_columns['categorical_feature'] = [col for col in categorical_columns if col in params_columns['feature_name']]
+
+        try:
+            pb = ProgressFitModel(optuna_params['n_trials'] * len(sklearn_models), best_model['best_value'])
+            for model in sklearn_models:
+                pb.set_postfix('model', model.__name__)
+                study = optuna.create_study(direction="maximize")
+
+                if model.__name__ == 'LGBMRegressor':
+                    add_params = params_columns
+                else:
+                    add_params = {}
+                    
+                study.optimize(
+                    Optimizer(
+                        X_, Y_, model, sklearn_models[model], add_params, pb, **optimize_params
+                        ), callbacks=[lambda study, trial: gc.collect()], **optuna_params)
+
+                currrent_model = {"model":model, "params":study.best_params, "best_value":study.best_value}
+                if study.best_value > best_model['best_value']:
+                    best_model = currrent_model
+                    print(best_model)                
+        except Exception as e:
+            if str(e) == "Too small sample for cross validation!":
+                raise e
+            print(e)
+
+        model = best_model['model'](**best_model['params']).fit(X_, Y_)
+        self._repr_dict_model(best_model)
+
+        self.estimator = model
         print("*"*100, f'\nBest model = {self.estimator}')
-
         with open("model_" + datetime.now().strftime("%Y_%m_%d_m%M"), 'wb') as save_file:
             pickle.dump(self, save_file)
 
     ##############################################################################
-    def fit_sklearn_model(self, X:pd.DataFrame, Y:pd.DataFrame, 
-                            X_test:pd.DataFrame, Y_test:pd.DataFrame,
-                            rating_func:Callable = r2_score, params:dict = {}):
-        params = {**{"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False}, **params}
-        best_model = {"model":object, "params":{}, "best_value":0}
 
-        try:
-            pb = ProgressFitModel(params['n_trials'] * len(sklearn_models))
-            for model in sklearn_models:
-                pb.set_postfix('model', model.__name__)
-                study = optuna.create_study(direction='maximize')
-                study.optimize(SklearnOptimizer(X, Y, X_test, Y_test, rating_func,
-                                            pb, model, sklearn_models[model])
-                               ,callbacks=[lambda study, trial: gc.collect()], **params)
-                currrent_model = {"model":model, "params":study.best_params, "best_value":study.best_value}
-                if study.best_value > best_model['best_value']:
-                    best_model = currrent_model                   
-        except:
-            pass
+    # def _direction_study(self, func:str):
+    #     minimize = ['max_error', 'neg_mean_absolute_error', 'neg_mean_squared_error',
+    #                 'neg_root_mean_squared_error', 'neg_mean_squared_log_error', 
+    #                 'neg_median_absolute_error', 'neg_mean_poisson_deviance', 
+    #                 'neg_mean_gamma_deviance', 'neg_mean_absolute_percentage_error', 
+    #                 'neg_brier_score']
 
-        model = best_model['model'](**best_model['params']).fit(X, Y)
-        result = model.predict(X_test)
-        self._repr_dict_model(best_model)
-        return model, result
-        
-    ##############################################################################
-    def fit_lgbm_model(self, X:pd.DataFrame, Y:pd.DataFrame, 
-                            X_test:pd.DataFrame, Y_test:pd.DataFrame, 
-                            rating_func:Callable = r2_score, params:dict = {}, 
-                            categorical_columns:List[str] = []):
-        params = {**{"n_trials":100,  "n_jobs" :-1, 'show_progress_bar':False}, **params}
-        if type(X) == pd.DataFrame:
-            params_columns = {"feature_name": list(X.columns), 'early_stopping_rounds':300, 'verbose':False}
-            params_columns['categorical_feature'] = [col for col in categorical_columns if col in params_columns['feature_name']]
-        else:
-            params_columns = {}
-
-        pb = ProgressFitModel(params['n_trials'])
-        pb.set_postfix('model',"LGBMORegressor")
-        study = optuna.create_study(direction='maximize')
-        study.optimize(LGBMOptimizer(X, Y, X_test, Y_test, rating_func, pb, 
-                                     lightgbm_models[0], lightgbm_models[1], params_columns)
-                       ,callbacks=[lambda study, trial: gc.collect()], **params)
-
-        model = lightgbm_models[0](**study.best_params).fit(X, Y, eval_set = [(X_test, Y_test)], **params_columns)
-        result = model.predict(X_test)
-
-        best_model = {"model":lightgbm_models[0], "params":study.best_params, "best_value":study.best_value}
-        self._repr_dict_model(best_model)
-        return model, result
+    #     return  'minimize' if func in minimize else 'maximize'        
 
     def _repr_dict_model(self, model:dict) -> str:
         params = str(model['params'])[1:-1]

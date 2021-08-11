@@ -105,6 +105,7 @@ def _linear_svr(trial):
 
 sklearn_models = {
     RandomForestRegressor: _random_forest_regressor,
+    LGBMRegressor:_lightgbm_regressor, 
     XGBRegressor: _xgb_regressor,
     DecisionTreeRegressor: _decision_tree_regressor,
     ExtraTreesRegressor: _extra_trees_regressor,
@@ -115,8 +116,6 @@ sklearn_models = {
     KNeighborsRegressor: _kneighbors_regressor,
     LinearSVR: _linear_svr
     }
-
-lightgbm_models = (LGBMRegressor, _lightgbm_regressor)
 
 
 
