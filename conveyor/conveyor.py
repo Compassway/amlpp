@@ -14,7 +14,6 @@ import numpy as np
 import warnings
 import optuna
 import pickle
-import eli5
 import tqdm 
 import shap
 import time
@@ -212,15 +211,6 @@ class Conveyor:
             if save:
                 plt.savefig(f'{name_plot}_lgb.jpeg')
             plt.show()
-            
-        if 'all' in show or 'eli5' in show:
-            try:
-                display(eli5.show_weights(self.estimator, feature_names = list(X_.columns)))
-                if save:
-                    df_weights = eli5.explain_weights_df(self.estimator, feature_names = list(X_.columns))
-                    df_weights.to_excel(f'{name_plot}_eli5.xlsx')
-            except Exception as e:
-                print('eli5 table - ERROR: ', e)
 
         if 'all' in show  or 'shap' in show:
             try:
