@@ -51,7 +51,7 @@ class Experimenter():
         
     def make_experiment(self, 
                             X_test:pd.DataFrame, Y_test:pd.DataFrame,
-                            description:str = "", testset_name:str = "",
+                            description:str = "", test_result_name:str = "",
                             X_test_features:List[str] = [],
                             feature_importances:bool = True,
                             scoring:bool = True):
@@ -83,10 +83,10 @@ class Experimenter():
                 except Exception as e:
                     score += f"function - {metr.__name__} = ERROR: {e}\n"
 
-            testset_name = f"({self.experiment})" + testset_name
+            test_result_name = f"({self.experiment})" + test_result_name
 
             description =  '\n' +"*"*60 + f"\n{datetime.now()}\n{description}"
-            description += "\ntestset = " + testset_name
+            description += "\ntestset = " + test_result_name
             description += "\nScore: " + score
             
             self.add_description(description)
@@ -95,20 +95,20 @@ class Experimenter():
             result_data = X_test[X_test_features] if X_test_features else pd.DataFrame()
             result_data['target'] = y_
             result_data['result'] = res
-            result_data.to_excel(self.path_experiment + f"/{testset_name}.xlsx")
+            result_data.to_excel(self.path_experiment + f"/{test_result_name}.xlsx")
 
             if scoring and 'status_id' in X_test.columns:
                 try:
                     data_for_table = pd.DataFrame({"result":res, 'status_id':X_test['status_id']})
                     print(data_for_table)
                     scoring_table = get_scoring_table_statistic(data_for_table)
-                    result_data.to_excel(self.path_experiment + f"/{testset_name}_scoring.xlsx")
+                    result_data.to_excel(self.path_experiment + f"/{test_result_name}_scoring.xlsx")
                 except Exception as e:
                     print('Error create scoring table')
 
             
             if feature_importances:
-                plot_path = self.path_experiment + f"/{testset_name}"
+                plot_path = self.path_experiment + f"/{test_result_name}"
                 self.model.feature_importances(X_test, X_test, save = True, name_plot = plot_path)
         else:
             print("You need to start to the experiment !")

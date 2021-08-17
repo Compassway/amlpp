@@ -292,7 +292,7 @@ class Conveyor:
                 currrent_model = {"model":model, "params":study.best_params, "best_value":study.best_value}
                 if study.best_value > best_model['best_value']:
                     best_model = currrent_model
-                    print(best_model)                
+                    self._repr_dict_model(best_model)       
         except Exception as e:
             if str(e) == "Too small sample for cross validation!":
                 raise e

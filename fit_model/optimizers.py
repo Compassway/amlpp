@@ -31,16 +31,19 @@ class Optimizer(object):
     
     def __call__(self, trial):
         model = self.model(**self.model_params(trial))
-        if self.cross_validation:
+        if type(self.rating_func) == str:
             scoring = make_scorer(get_scorer(self.rating_func)._score_func, greater_is_better = self.greater_is_better)
+        else:
+            scoring = make_scorer(self.rating_func, greater_is_better = self.greater_is_better)
+
+        if self.cross_validation:
             score = cross_val_score(model, self.X, self.Y, cv = self.k_fold, scoring = scoring, fit_params = self.add_params)
             score = np.mean([sc for sc in score if sc == sc])
             if score != score:
                 raise ValueError('Too small sample for cross validation')
         else:
             X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size = self.test_size, random_state = 42)
-            score = make_scorer(get_scorer(self.rating_func)._score_func, greater_is_better = self.greater_is_better)
-            score = score(model.fit(X_train, Y_train), X_test, Y_test)
+            score = scoring(model.fit(X_train, Y_train), X_test, Y_test)
 
         if tqdm != None:
             self.tqdm_bar.update(score, model.__class__.__name__)

@@ -29,10 +29,12 @@ class CategoricalEncoder(BaseTransform):
         return self
 
     def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
+        # print(X.columns)
         for column in self.encoder:
             if column in X.columns:
                 if self.encoder[column]:
                     X[column] = self.encoder[column].transform(pd.DataFrame(X[column].fillna('NAN')))
                 else:
                     del X[column]
+        # print(X.columns)
         return X
