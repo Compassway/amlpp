@@ -1,10 +1,7 @@
-from sklearn.metrics import r2_score, roc_auc_score, accuracy_score, explained_variance_score
 from sklearn.inspection import permutation_importance
-from sklearn.model_selection import train_test_split
 
 from typing import List, Callable
 
-from IPython.display import display
 from datetime import datetime
 
 import matplotlib.pyplot as plt

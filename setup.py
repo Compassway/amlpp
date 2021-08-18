@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="amlpp",
-    version="0.0.5",
+    version="0.1.9.1",
     author="Asir Muminov",
     author_email="vojt.tieg295i@gmail.com",
     description="Wrapper for ml library",
@@ -17,13 +17,17 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    packages=['additional', 'architect', 'conveyor', 'fit_model', 'transformers'],
-    python_requires=">=3.6,<3.9",
+    # package_dir={"": "amlpp"},
+    packages = find_packages(include=['amlpp', 'amlpp.*']),
+    # packages=['amlpp'],
+    # packages=['additional', 'architect', 'conveyor', 'fit_model', 'transformers'],
+    python_requires=">=3.0",
     install_requires=[
         "scikit-learn",
         "matplotlib",
         "pymorphy2",
         "lightgbm",
+        "xgboost",
         "typing",
         "gensim",
         "optuna",

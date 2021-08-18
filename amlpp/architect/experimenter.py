@@ -7,8 +7,6 @@ from typing import List
 import pandas as pd
 import pickle
 import os
-
-from .._creditup import get_scoring_table_statistic
 ##############################################################################
 class Experimenter():
     """ The class for working with the structure of experiments in the project
@@ -96,16 +94,6 @@ class Experimenter():
             result_data['target'] = y_
             result_data['result'] = res
             result_data.to_excel(self.path_experiment + f"/{test_result_name}.xlsx")
-
-            if scoring and 'status_id' in X_test.columns:
-                try:
-                    data_for_table = pd.DataFrame({"result":res, 'status_id':X_test['status_id']})
-                    print(data_for_table)
-                    scoring_table = get_scoring_table_statistic(data_for_table)
-                    result_data.to_excel(self.path_experiment + f"/{test_result_name}_scoring.xlsx")
-                except Exception as e:
-                    print('Error create scoring table')
-
             
             if feature_importances:
                 plot_path = self.path_experiment + f"/{test_result_name}"
