@@ -281,6 +281,7 @@ class Conveyor:
                     best_model = currrent_model
                     self._repr_dict_model(best_model)       
         except Exception as e:
+            print(e)
             if str(e) == "Too small sample for cross validation!":
                 raise e
             print(e)

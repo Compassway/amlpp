@@ -26,10 +26,11 @@ def _lightgbm_regressor(trial):
     'cat_smooth' : trial.suggest_int('cat_smooth', 1, 100)}
 
 def _random_forest_regressor(trial):
-    return {'max_features': trial.suggest_categorical('max_features', np.arange(0.05, 1.01, 0.05)),
+    return {'max_features': trial.suggest_categorical('max_features', ["auto", "sqrt", "log2"]),
+    'max_depth': trial.suggest_categorical('max_depth', np.append( np.arange(1,10,1), [None])),
     'min_samples_split': trial.suggest_int('min_samples_split', 2, 21),
     'bootstrap': trial.suggest_categorical('bootstrap', [True, False]),
-    'n_estimators': trial.suggest_int('n_estimators', 100, 1000, 100),
+    'n_estimators': trial.suggest_int('n_estimators', 100, 2000, 200),
     'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 21),
     'random_state': trial.suggest_int('random_state', 42, 42),
     'verbose': trial.suggest_categorical('verbose', [0])}
@@ -51,14 +52,26 @@ def _sgd_regressor(trial):
         'eta0': trial.suggest_categorical('eta0', [0.1, 1.0, 0.01]),
         'random_state': trial.suggest_int('random_state', 42, 42)}
         
+# def _xgb_regressor(trial):
+#     return {'learning_rate': trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
+#         'subsample': trial.suggest_categorical('subsample', np.arange(0.05, 1.01, 0.05)),
+#         'objective': trial.suggest_categorical('objective', ['reg:squarederror']),
+#         'min_child_weight': trial.suggest_int('min_child_weight', 1, 21),
+#         'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100), 
+#         'verbosity': trial.suggest_categorical('verbosity', [0]),
+#         'max_depth': trial.suggest_int('max_depth', 1, 11)}
+        
 def _xgb_regressor(trial):
-    return {'learning_rate': trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
+    return {'learning_rate': trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.3,  0.5, 1.]),
         'subsample': trial.suggest_categorical('subsample', np.arange(0.05, 1.01, 0.05)),
         'objective': trial.suggest_categorical('objective', ['reg:squarederror']),
         'min_child_weight': trial.suggest_int('min_child_weight', 1, 21),
         'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100), 
         'verbosity': trial.suggest_categorical('verbosity', [0]),
-        'max_depth': trial.suggest_int('max_depth', 1, 11)}
+        'max_depth': trial.suggest_int('max_depth', 1, 11),
+        'alpha': trial.suggest_categorical('alpha', [1,10]),
+        'booster': trial.suggest_categorical('booster', ['gbtree']),}
+        # 'booster': trial.suggest_categorical('booster', ['gbtree', 'gblinearили', 'dart'])}
 
 def _ridge_cv(trial):
     return {'alphas': trial.suggest_categorical('alphas', [1e-3, 1e-2, 1e-1, 1]),
