@@ -235,7 +235,8 @@ class Conveyor:
                 print('Sklearn plot - ERROR: ', e)
             
     ##############################################################################
-    def fit_model(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series,
+    def fit_model(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series, type_model:str,
+                    verbose:bool = True,
                     optuna_params:dict = {}, optimize_params:dict = {},
                     categorical_columns:List[str] = []):
         """ Model selection
@@ -261,8 +262,10 @@ class Conveyor:
             params_columns['categorical_feature'] = [col for col in categorical_columns if col in params_columns['feature_name']]
 
         try:
-            pb = ProgressFitModel(optuna_params['n_trials'] * len(sklearn_models), best_model['best_value'])
-            for model in sklearn_models:
+            models = models_regression if type_model == 'regression' else models_classification
+
+            pb = ProgressFitModel(optuna_params['n_trials'] * len(models), best_model['best_value'])
+            for model in models:
                 pb.set_postfix('model', model.__name__)
                 study = optuna.create_study(direction="maximize")
 
@@ -271,15 +274,15 @@ class Conveyor:
                 else:
                     add_params = {}
                     
-                study.optimize(
-                    Optimizer(
-                        X_, Y_, model, sklearn_models[model], add_params, pb, **optimize_params
-                        ), callbacks=[lambda study, trial: gc.collect()], **optuna_params)
+                study.optimize(Optimizer(X_, Y_, model, models[model], add_params, pb, **optimize_params
+                              ), callbacks=[lambda study, trial: gc.collect()], **optuna_params)
 
                 currrent_model = {"model":model, "params":study.best_params, "best_value":study.best_value}
+                self._update_fit_model_log(currrent_model)
                 if study.best_value > best_model['best_value']:
                     best_model = currrent_model
-                    self._repr_dict_model(best_model)       
+                    print(self._repr_dict_model(best_model))
+
         except Exception as e:
             print(e)
             if str(e) == "Too small sample for cross validation!":
@@ -287,7 +290,7 @@ class Conveyor:
             print(e)
 
         model = best_model['model'](**best_model['params']).fit(X_, Y_)
-        self._repr_dict_model(best_model)
+        print(self._repr_dict_model(best_model))
 
         self.estimator = model
         print("*"*100, f'\nBest model = {self.estimator}')
@@ -304,8 +307,13 @@ class Conveyor:
     #                 'neg_brier_score']
 
     #     return  'minimize' if func in minimize else 'maximize'        
+    def _update_fit_model_log(self, model:dict):
+        with open('fit_model_log.txt', 'a+') as file:
+            text = self._repr_dict_model(model) + "\n"
+            text += "*"*100 + "\n"
+            file.write(text)
 
     def _repr_dict_model(self, model:dict) -> str:
         params = str(model['params'])[1:-1]
         params = params.replace(':', " =").replace("'", "")
-        print(f"{model['model'].__name__}({params})\nbest_value = {model['best_value']}")
+        return f"{model['model'].__name__}({params})\nbest_value = {model['best_value']}"

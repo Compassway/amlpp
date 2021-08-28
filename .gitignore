@@ -6,3 +6,6 @@ __pycache__/__init__.cpython-38.pyc
 *.xlsx
 */*/__pycache__/
 _assembly/experiments/
+_assembly/model_2021_08_20_m10
+.gitignore
+_assembly/fit_model_log.txt

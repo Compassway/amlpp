@@ -1,12 +1,12 @@
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor, AdaBoostRegressor
-from sklearn.linear_model import SGDRegressor, RidgeCV
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor, AdaBoostRegressor, RandomForestClassifier, AdaBoostClassifier, ExtraTreesClassifier, GradientBoostingClassifier
+from sklearn.linear_model import SGDRegressor, RidgeCV, SGDClassifier
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.svm import LinearSVR
 
-from lightgbm import LGBMRegressor
+from lightgbm import LGBMRegressor, LGBMClassifier
 
-from xgboost import XGBRegressor
+from xgboost import XGBRegressor, XGBClassifier
 
 import numpy as np
 
@@ -97,10 +97,26 @@ def _gradient_boosting_regressor(trial):
         'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100),
         'random_state': trial.suggest_int('random_state', 42, 42)}
 
+def _gradient_boosting_classfier(trial):
+    return {'learning_rate' : trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
+        'max_features' : trial.suggest_categorical('max_features', np.arange(0.05, 1.01, 0.05)),
+        'min_samples_split' : trial.suggest_categorical('min_samples_split', range(2, 21)),
+        'subsample' : trial.suggest_categorical('subsample', np.arange(0.05, 1.01, 0.05)),
+        'min_samples_leaf' : trial.suggest_categorical('min_samples_leaf', range(1, 21)),
+        'max_depth' : trial.suggest_categorical('max_depth', range(1, 11)),
+        'n_estimators': trial.suggest_int('n_estimators', 100, 600, 100),
+        'random_state': trial.suggest_int('random_state', 42, 42)}
+
+
 def _ada_boost_regressor(trial):
     return {'n_estimators' : trial.suggest_categorical('n_estimators', [100, 200, 300, 400, 500, 600]),
         'learning_rate' : trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
         'loss' : trial.suggest_categorical('loss', ["linear", "square", "exponential"]),
+        'random_state': trial.suggest_int('random_state', 42, 42)}
+
+def _ada_boost_classfier(trial):
+    return {'n_estimators' : trial.suggest_categorical('n_estimators', [100, 200, 300, 400, 500, 600]),
+        'learning_rate' : trial.suggest_categorical('learning_rate', [1e-3, 1e-2, 1e-1, 0.5, 1.]),
         'random_state': trial.suggest_int('random_state', 42, 42)}
 
 def _kneighbors_regressor(trial):
@@ -116,7 +132,7 @@ def _linear_svr(trial):
         'dual' : trial.suggest_categorical('dual', [True, False]),
         'random_state': trial.suggest_int('random_state', 42, 42)}
 
-sklearn_models = {
+models_regression = {
     RandomForestRegressor: _random_forest_regressor,
     LGBMRegressor:_lightgbm_regressor, 
     XGBRegressor: _xgb_regressor,
@@ -130,6 +146,19 @@ sklearn_models = {
     LinearSVR: _linear_svr
     }
 
+models_classification = {
+    RandomForestClassifier: _random_forest_regressor,
+    LGBMClassifier: _lightgbm_regressor, 
+    XGBClassifier: _xgb_regressor,
+    DecisionTreeClassifier: _decision_tree_regressor,
+    ExtraTreesClassifier: _extra_trees_regressor,
+    GradientBoostingClassifier: _gradient_boosting_classfier,
+    AdaBoostClassifier: _ada_boost_classfier,
+    SGDClassifier: _sgd_regressor,
+    RidgeCV: _ridge_cv,
+    KNeighborsClassifier: _kneighbors_regressor,
+    LinearSVR: _linear_svr
+}
 
 
 

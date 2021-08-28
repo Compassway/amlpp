@@ -1,2 +1,2 @@
-from .regressor_params import sklearn_models
+from .model_params import models_regression, models_classification
 from .optimizers import Optimizer

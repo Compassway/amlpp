@@ -1,5 +1,5 @@
 from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.metrics import get_scorer, make_scorer, mean_squared_error
+from sklearn.metrics import get_scorer, make_scorer
 from typing import List, Callable, Tuple
 
 import pandas as pd
