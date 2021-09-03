@@ -182,7 +182,7 @@ class Conveyor:
     ##############################################################################
     def feature_importances(self,
                             X:pd.DataFrame, Y:pd.DataFrame or pd.Series, 
-                            show:str = ['sklearn', 'eli5', "lgbm"],
+                            show:str = ['sklearn', "lgbm"],
                             save:bool = True,
                             name_plot:str = ""): 
         """Plotting feature importances
