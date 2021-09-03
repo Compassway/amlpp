@@ -1,4 +1,4 @@
-from sklearn.metrics import roc_auc_score, accuracy_score, r2_score
+from sklearn.metrics import roc_auc_score, accuracy_score, r2_score, mean_squared_error, mean_absolute_error
 from amlpp.conveyor import Conveyor
 
 from datetime import datetime
@@ -42,17 +42,16 @@ class Experimenter():
         self.model = model
 
         description = description_model 
-        description += f"\ntrainset = {description_trainset}"
-        description += f"\n{repr(self.model)}"
+        description += f"\nTrainset: {description_trainset}"
+        description += f"\nModel:\n{repr(self.model)}"
 
-        self.add_description(description, 'w')
+        self.add_description(self.path_experiment, description, 'w+')
         
     def make_experiment(self, 
-                            X_test:pd.DataFrame, Y_test:pd.DataFrame,
-                            description:str = "", test_result_name:str = "",
-                            X_test_features:List[str] = [],
-                            feature_importances:bool = True,
-                            scoring:bool = True):
+                            X:pd.DataFrame, Y:pd.DataFrame,
+                            expr_description:str = "", expr_name:str = "",
+                            X_features:List[str] = [],
+                            feature_importances:bool = True):
         """Carrying out an experiment on a test dataset
         Parameters
         ----------
@@ -72,37 +71,37 @@ class Experimenter():
             save and print scoring table or not
         """
         if self.model:
-            x_, y_ = self.model.transform(X_test, Y_test)
-            res = self.model.estimator.predict(x_)
+            date = datetime.now().strftime("%d-%m-%y %H-%M-%S")
+            path_current_experiment = f"{self.path_experiment}/{date} - {expr_name}"
+            os.makedirs(path_current_experiment)
+            
+
+            x_, y_ = self.model.transform(X, Y)
+            predict = self.model.estimator.predict(x_)
+
             score = ""
-            for metr in (r2_score, roc_auc_score, accuracy_score):
+            for metr in (r2_score,  mean_squared_error, mean_absolute_error, roc_auc_score, accuracy_score):
                 try:
-                    score += f"function - {metr.__name__} = {metr(y_, res)}\n"
+                    score += f"function - {metr.__name__} = {metr(y_, predict)}\n"
                 except Exception as e:
                     score += f"function - {metr.__name__} = ERROR: {e}\n"
 
-            test_result_name = f"({self.experiment})" + test_result_name
+            expr_name = f"({self.experiment}) {expr_name}"
 
-            description =  '\n' +"*"*60 + f"\n{datetime.now()}\n{description}"
-            description += "\ntestset = " + test_result_name
-            description += "\nScore: " + score
-            
-            self.add_description(description)
-            print(description)
+            expr_description = f"{expr_description}\nScore:\n{score}"
+            self.add_description(path_current_experiment, expr_description, 'w+')
+            print(expr_description)
 
-            result_data = X_test[X_test_features] if X_test_features else pd.DataFrame()
+            result_data = X[X_features] if X_features else pd.DataFrame()
             result_data['target'] = y_
-            result_data['result'] = res
-            result_data.to_excel(self.path_experiment + f"/{test_result_name}.xlsx")
+            result_data['result'] = predict
+            result_data.to_excel(path_current_experiment + f"/{expr_name}.xlsx")
             
             if feature_importances:
-                plot_path = self.path_experiment + f"/{test_result_name}"
-                self.model.feature_importances(X_test, X_test, save = True, name_plot = plot_path)
-        else:
-            print("You need to start to the experiment !")
-            print("Connect to existing experimnet or create experiment !")
+                plot_path = path_current_experiment + f"/{expr_name}"
+                self.model.feature_importances(X, X, save = True, name_plot = plot_path)
 
-    def add_description(self, add_description:str, mod:str = "a"):
+    def add_description(self, path:str, description:str, mod:str = "a"):
         """ add description
         Parameters
         ----------
@@ -111,8 +110,8 @@ class Experimenter():
         mod: str = ""
             mod for working with files
         """
-        with open(self.path_experiment + "/desc.txt", mod, encoding="utf-8") as file:
-            file.write(add_description)
+        with open(path + "/desc.txt", mod, encoding="utf-8") as file:
+            file.write(description)
 
     def _load_model(self) -> Conveyor:
         """ Loading the model
