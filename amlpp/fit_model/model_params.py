@@ -1,7 +1,8 @@
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor, AdaBoostRegressor, RandomForestClassifier, AdaBoostClassifier, ExtraTreesClassifier, GradientBoostingClassifier
-from sklearn.linear_model import SGDRegressor, RidgeCV, SGDClassifier
+from sklearn.linear_model import SGDRegressor, RidgeCV, SGDClassifier, Lasso
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
+from catboost import CatBoostRegressor
 from sklearn.svm import LinearSVR
 
 from lightgbm import LGBMRegressor, LGBMClassifier
@@ -132,6 +133,25 @@ def _linear_svr(trial):
         'dual' : trial.suggest_categorical('dual', [True, False]),
         'random_state': trial.suggest_int('random_state', 42, 42)}
 
+def _lasso_regressor(trial):
+    return {'alpha' : trial.suggest_loguniform('alpha', 1e-4, 1.0),
+        'normalize' : trial.suggest_categorical('normalize', [True, False]),
+        'max_iter': trial.suggest_int('max_iter', 100, 1000, 100),
+        'tol' : trial.suggest_loguniform('ещд', 1e-6, 1.0),
+        'random_state': trial.suggest_int('random_state', 42, 42)}
+
+def _cat_boost_regressor(trial):
+    return {'learning_rate' : trial.suggest_loguniform('learning_rate', 0.01, 1.0),
+        'depth': trial.suggest_int('depth', 1, 8),
+        'iterations': trial.suggest_int('iterations', 10, 2000, 200),
+        'random_strength' : trial.suggest_loguniform('random_strength', 1e-9, 10),
+        'random_state': trial.suggest_int('random_state', 42, 42),
+        'bagging_temperature': trial.suggest_categorical('bagging_temperature', np.linspace(0, 1, 20)),
+        'border_count': trial.suggest_int('border_count', 1, 255),
+        'l2_leaf_reg': trial.suggest_int('l2_leaf_reg', 2, 30),
+        'verbose': trial.suggest_categorical('verbose', [False])
+        }
+
 models_regression = {
     RandomForestRegressor: _random_forest_regressor,
     LGBMRegressor:_lightgbm_regressor, 
@@ -143,8 +163,10 @@ models_regression = {
     SGDRegressor: _sgd_regressor,
     RidgeCV: _ridge_cv,
     KNeighborsRegressor: _kneighbors_regressor,
-    LinearSVR: _linear_svr
-    }
+    LinearSVR: _linear_svr,
+    Lasso: _lasso_regressor,
+    CatBoostRegressor: _cat_boost_regressor
+}
 
 models_classification = {
     RandomForestClassifier: _random_forest_regressor,
@@ -157,7 +179,8 @@ models_classification = {
     SGDClassifier: _sgd_regressor,
     RidgeCV: _ridge_cv,
     KNeighborsClassifier: _kneighbors_regressor,
-    LinearSVR: _linear_svr
+    LinearSVR: _linear_svr,
+    Lasso: _lasso_regressor
 }
 
 
