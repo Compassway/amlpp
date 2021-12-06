@@ -27,7 +27,7 @@ class Imputer(BaseTransform):
         super().__init__({'columns':columns, **params})
         self.columns = columns
         self.current_columns = columns
-        self.imputer = model(**params, random_state=42)
+        self.imputer = model(**params)
 
     def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
         del_columns = []
@@ -79,5 +79,5 @@ class ImputerIterative(Imputer):
         Parameters for fillers
     """
     def __init__(self, columns:List[str] or None = None, **params):
-        params = {'max_iter':10, 'initial_strategy':'mean', 'missing_values':np.nan, **params} 
+        params = {'max_iter':10, 'initial_strategy':'mean', 'missing_values':np.nan, 'random_state':42, **params} 
         super().__init__(IterativeImputer, columns, params)
