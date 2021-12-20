@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="amlpp",
-    version="0.1.9.5",
+    version="0.1.9.6",
     author="Asir Muminov",
     author_email="vojt.tieg295i@gmail.com",
     description="Wrapper for ml library",
