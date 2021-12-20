@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="amlpp",
-    version="0.1.9.1",
+    version="0.1.9.5",
     author="Asir Muminov",
     author_email="vojt.tieg295i@gmail.com",
     description="Wrapper for ml library",
@@ -27,6 +27,7 @@ setup(
         "matplotlib",
         "pymorphy2",
         "lightgbm",
+        "catboost",
         "xgboost",
         "typing",
         "gensim",
