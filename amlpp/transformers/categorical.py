@@ -16,6 +16,7 @@ class CategoricalEncoder(BaseTransform):
     """ 
     def __init__(self, columns:List[str]):
         super().__init__({'columns':columns})
+        self.order_columns = None
         self.encoder = {column: OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value = np.nan) for column in columns}
 
     def fit(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series):
@@ -26,15 +27,15 @@ class CategoricalEncoder(BaseTransform):
                     self.encoder[column].fit(X_fit)
                 else:
                     self.encoder[column] = False
+        self.order_columns = X.columns
         return self
 
     def transform(self, X:pd.DataFrame, Y:pd.DataFrame or pd.Series = None):
-        # print(X.columns)
         for column in self.encoder:
             if column in X.columns:
                 if self.encoder[column]:
                     X[column] = self.encoder[column].transform(pd.DataFrame(X[column].fillna('NAN')))
                 else:
                     del X[column]
-        # print(X.columns)
+        X = X[self.order_columns]
         return X
